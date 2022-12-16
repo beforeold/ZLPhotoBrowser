@@ -51,6 +51,27 @@ class ZLWeakProxy: NSObject {
 
 import Photos
 
+public struct PhotoPreview {
+    /// create a preview vc
+    /// - Parameters:
+    ///   - photos: the photos with selecte status
+    ///   - index: the displaying index at first
+    ///   - selectionEventCallback: the callback event for currentModel with selected updated
+    /// - Returns: the navigation controller
+    public static func createPhotoPreviewVC(
+        photos: [ZLPhotoModel],
+        index: Int = 0,
+        selectionEventCallback: @escaping (ZLPhotoModel) -> Void = { _ in }
+    ) -> UINavigationController {
+        let vc = PhotoPreviewController(
+            photos: photos,
+            index: index
+        )
+        vc.selectionEventCallback = selectionEventCallback
+        return ZLImageNavController(rootViewController: vc)
+    }
+}
+
 class PhotoPreviewController: UIViewController {
     
     static let colItemSpacing: CGFloat = 40
@@ -60,6 +81,8 @@ class PhotoPreviewController: UIViewController {
     static let previewVCScrollNotification = Notification.Name("previewVCScrollNotification")
     
     let arrDataSources: [ZLPhotoModel]
+    
+    var selectionEventCallback: (ZLPhotoModel) -> Void = { _ in }
     
     var currentIndex: Int
     
@@ -160,7 +183,7 @@ class PhotoPreviewController: UIViewController {
         return btn
     }()
     
-    private var selPhotoPreview: ZLPhotoPreviewSelectedView?
+    private var selPhotoPreview: PhotoPreviewSelectedView?
     
     private var isFirstAppear = true
     
@@ -204,7 +227,17 @@ class PhotoPreviewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        ZLPhotoConfiguration.default().showSelectedPhotoPreview(true)
+        // setup style
+        ZLPhotoConfiguration.default()
+            .showSelectedPhotoPreview(true)
+            .maxSelectCount(1_000_000)
+            .showSelectedIndex(false)
+        
+        ZLPhotoUIConfiguration.default()
+            .navBarColorOfPreviewVC(UIColor.black)
+            .previewVCBgColor(self.collectionViewColor)
+            .showStatusBarInPreviewInterface(true)
+            .statusBarStyle(.lightContent)
         
         setupUI()
         
@@ -236,16 +269,25 @@ class PhotoPreviewController: UIViewController {
         }
         insets.top = max(20, insets.top)
         
+        /*
         collectionView.frame = CGRect(
             x: -ZLPhotoPreviewController.colItemSpacing / 2,
             y: 0,
             width: view.frame.width + ZLPhotoPreviewController.colItemSpacing,
             height: view.frame.height
         )
+        */
         
         let navH = insets.top + 44
         navView.frame = CGRect(x: 0, y: 0, width: view.frame.width, height: navH)
         navBlurView?.frame = navView.bounds
+        
+        collectionView.frame = CGRect(
+            x: -ZLPhotoPreviewController.colItemSpacing / 2,
+            y: navH,
+            width: view.frame.width + ZLPhotoPreviewController.colItemSpacing,
+            height: getItemHeight()
+        )
         
         backBtn.frame = CGRect(x: insets.left, y: insets.top, width: 60, height: 44)
         selectBtn.frame = CGRect(x: view.frame.width - 40 - insets.right, y: insets.top + (44 - 25) / 2, width: 25, height: 25)
@@ -285,13 +327,17 @@ class PhotoPreviewController: UIViewController {
         var bottomViewH = ZLLayout.bottomToolViewH
         var showSelPhotoPreview = false
         if ZLPhotoConfiguration.default().showSelectedPhotoPreview, let nav = navigationController as? ZLImageNavController {
-            if !nav.arrSelectedModels.isEmpty {
+//            if !nav.arrSelectedModels.isEmpty {
                 showSelPhotoPreview = true
                 bottomViewH += ZLPhotoPreviewController.selPhotoPreviewH
                 selPhotoPreview?.frame = CGRect(x: 0, y: 0, width: view.frame.width, height: ZLPhotoPreviewController.selPhotoPreviewH)
-            }
+//            }
         }
         let btnH = ZLLayout.bottomToolBtnH
+        
+        // ignore ZLLayout.bottomToolViewH
+        bottomViewH = ZLPhotoPreviewController.selPhotoPreviewH
+        bottomView.layer.masksToBounds = true
         
         bottomView.frame = CGRect(x: 0, y: view.frame.height - insets.bottom - bottomViewH, width: view.frame.width, height: bottomViewH + insets.bottom)
         bottomBlurView?.frame = bottomView.bounds
@@ -343,8 +389,13 @@ class PhotoPreviewController: UIViewController {
         }
         
         if config.showSelectedPhotoPreview {
+            /*
             let selModels = (navigationController as? ZLImageNavController)?.arrSelectedModels ?? []
-            selPhotoPreview = ZLPhotoPreviewSelectedView(selModels: selModels, currentShowModel: arrDataSources[currentIndex])
+            selPhotoPreview = PhotoPreviewSelectedView(selModels: selModels, currentShowModel: arrDataSources[currentIndex])
+            */
+            
+            selPhotoPreview = PhotoPreviewSelectedView(selModels: self.arrDataSources, currentShowModel: arrDataSources[currentIndex])
+            
             selPhotoPreview?.selectBlock = { [weak self] model in
                 self?.scrollToSelPreviewCell(model)
             }
@@ -465,7 +516,9 @@ class PhotoPreviewController: UIViewController {
         }
         doneBtn.setTitle(doneTitle, for: .normal)
         
+        /*
         selPhotoPreview?.isHidden = selCount == 0
+        */
         refreshBottomViewFrame()
         
         var hideEditBtn = true
@@ -537,6 +590,7 @@ class PhotoPreviewController: UIViewController {
             nav.arrSelectedModels.append(currentModel)
             selPhotoPreview?.addSelModel(model: currentModel)
         }
+        selectionEventCallback(currentModel)
         resetSubViewStatus()
     }
     
@@ -668,8 +722,12 @@ class PhotoPreviewController: UIViewController {
                 hideNavView = true
             }
         }
+        
+        // always show navViews
+        /*
         navView.isHidden = hideNavView
         bottomView.isHidden = showBottomViewAndSelectBtn ? hideNavView : true
+        */
     }
     
     private func showEditImageVC(image: UIImage) {
@@ -782,7 +840,17 @@ extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDe
     }
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        return CGSize(width: view.bounds.width, height: view.bounds.height)
+        return CGSize(width: view.bounds.width, height: getItemHeight())
+    }
+    
+    func getItemHeight() -> CGFloat {
+        var insets = UIEdgeInsets(top: 20, left: 0, bottom: 0, right: 0)
+        if #available(iOS 11.0, *) {
+            insets = self.view.safeAreaInsets
+        }
+        
+        let navH = insets.top + 44
+        return view.frame.height - navH - insets.bottom - Self.selPhotoPreviewH
     }
     
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
@@ -833,7 +901,14 @@ extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDe
             self?.tapPreviewCell()
         }
         
+        let view = baseCell.contentView
+//        view.backgroundColor = collectionViewColor
+        
         return baseCell
+    }
+    
+    var collectionViewColor: UIColor {
+        UIColor(red: 0.184, green: 0.184, blue: 0.184, alpha: 1)
     }
     
     func collectionView(_ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
@@ -843,9 +918,9 @@ extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDe
 }
 
 // MARK: 下方显示的已选择照片列表
-/*
-class ZLPhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDragDelegate, UICollectionViewDropDelegate {
-    
+
+class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDragDelegate, UICollectionViewDropDelegate {
+    typealias ZLPhotoPreviewSelectedViewCell = PhotoPreviewSelectedViewCell
     private lazy var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.itemSize = CGSize(width: 60, height: 60)
@@ -929,18 +1004,25 @@ class ZLPhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollecti
     }
     
     func addSelModel(model: ZLPhotoModel) {
+        refreshCell(for: model)
+        /*
         arrSelectedModels.append(model)
         let indexPath = IndexPath(row: arrSelectedModels.count - 1, section: 0)
         collectionView.insertItems(at: [indexPath])
         collectionView.scrollToItem(at: indexPath, at: .centeredHorizontally, animated: true)
+        */
     }
     
     func removeSelModel(model: ZLPhotoModel) {
+        refreshCell(for: model)
+        return
+        /*
         guard let index = arrSelectedModels.firstIndex(where: { $0 == model }) else {
             return
         }
         arrSelectedModels.remove(at: index)
         collectionView.deleteItems(at: [IndexPath(row: index, section: 0)])
+        */
     }
     
     func refreshCell(for model: ZLPhotoModel) {
@@ -1065,7 +1147,8 @@ class ZLPhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollecti
     
 }
 
-class ZLPhotoPreviewSelectedViewCell: UICollectionViewCell {
+
+class PhotoPreviewSelectedViewCell: UICollectionViewCell {
     
     private lazy var imageView: UIImageView = {
         let view = UIImageView()
@@ -1115,7 +1198,10 @@ class ZLPhotoPreviewSelectedViewCell: UICollectionViewCell {
     
     override func layoutSubviews() {
         super.layoutSubviews()
-        imageView.frame = bounds
+        
+        let value: CGFloat = model.isSelected ? 10 : 0
+        let frame = bounds.inset(by: .init(top: value, left: value, bottom: value, right: value))
+        imageView.frame = frame
         tagImageView.frame = CGRect(x: 5, y: bounds.height - 25, width: 20, height: 20)
         tagLabel.frame = CGRect(x: 5, y: bounds.height - 25, width: bounds.width - 10, height: 20)
     }
@@ -1161,8 +1247,7 @@ class ZLPhotoPreviewSelectedViewCell: UICollectionViewCell {
                 }
             })
         }
+        
+        
     }
-    
 }
-
-*/

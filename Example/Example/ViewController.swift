@@ -100,6 +100,14 @@ class ViewController: UIViewController {
             make.top.equalTo(cameraBtn.snp.bottom).offset(20)
         }
         
+        let photoPreviewButton = createBtn("Photo Preview", #selector(createPhotosPreview))
+        photoPreviewButton.backgroundColor = .darkGray
+        view.addSubview(photoPreviewButton)
+        photoPreviewButton.snp.makeConstraints { make in
+            make.left.equalTo(wechatMomentDemoBtn.snp.right).offset(20)
+            make.top.equalTo(cameraBtn.snp.bottom).offset(20)
+        }
+        
         let takeLabel = UILabel()
         takeLabel.font = UIFont.systemFont(ofSize: 14)
         takeLabel.textColor = .black
@@ -363,6 +371,23 @@ class ViewController: UIViewController {
     
     @objc func createWeChatMomentDemo() {
         let vc = WeChatMomentDemoViewController()
+        show(vc, sender: nil)
+    }
+    
+    @objc func createPhotosPreview() {
+        let result = PHAsset.fetchAssets(with: nil)
+        var assets: [ZLPhotoModel] = []
+        result.enumerateObjects { asset, index, stop in
+            if index == 10 {
+                stop.pointee = true
+                return
+            }
+            let photo = ZLPhotoModel(asset: asset)
+            photo.isSelected = index % 2 == 0
+            assets.append(photo)
+        }
+        
+        let vc = PhotoPreview.createPhotoPreviewVC(photos: assets)
         show(vc, sender: nil)
     }
 }
