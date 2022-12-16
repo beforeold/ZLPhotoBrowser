@@ -238,12 +238,15 @@ class PhotoPreviewController: UIViewController {
             .showSelectedPhotoPreview(true)
             .maxSelectCount(1_000_000)
             .showSelectedIndex(false)
+            .animateSelectBtnWhenSelect(false)
         
         ZLPhotoUIConfiguration.default()
             .navBarColorOfPreviewVC(UIColor.black)
             .previewVCBgColor(self.collectionViewColor)
             .showStatusBarInPreviewInterface(true)
             .statusBarStyle(.lightContent)
+            .bottomToolViewBgColorOfPreviewVC(.black)
+            .bottomViewBlurEffectOfPreview(nil)
         
         setupUI()
         
@@ -1230,8 +1233,9 @@ class PhotoPreviewSelectedViewCell: UICollectionViewCell {
         
         imageView.layer.cornerRadius = 8
         imageView.layer.masksToBounds = true
-        imageView.layer.borderColor = UIColor.zl.bottomToolViewBtnNormalBgColorOfPreviewVC.cgColor
-        
+        // imageView.layer.borderColor = UIColor.zl.bottomToolViewBtnNormalBgColorOfPreviewVC.cgColor
+        imageView.layer.borderColor = UIColor(red: 0.373, green: 0.439, blue: 0.996, alpha: 1).cgColor
+      
         contentView.addSubview(imageView)
         contentView.addSubview(tagImageView)
         contentView.addSubview(tagLabel)
