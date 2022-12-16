@@ -347,13 +347,13 @@ class PhotoPreviewController: UIViewController {
 //            if !nav.arrSelectedModels.isEmpty {
                 showSelPhotoPreview = true
                 bottomViewH += ZLPhotoPreviewController.selPhotoPreviewH
-                selPhotoPreview?.frame = CGRect(x: 0, y: 0, width: view.frame.width, height: ZLPhotoPreviewController.selPhotoPreviewH)
+                selPhotoPreview?.frame = CGRect(x: 0, y: 0, width: view.frame.width, height: Self.selPhotoPreviewH)
 //            }
         }
         let btnH = ZLLayout.bottomToolBtnH
         
         // ignore ZLLayout.bottomToolViewH
-        bottomViewH = ZLPhotoPreviewController.selPhotoPreviewH
+        bottomViewH = Self.selPhotoPreviewH
         bottomView.layer.masksToBounds = true
         
         bottomView.frame = CGRect(x: 0, y: view.frame.height - insets.bottom - bottomViewH, width: view.frame.width, height: bottomViewH + insets.bottom)

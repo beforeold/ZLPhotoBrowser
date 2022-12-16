@@ -1045,7 +1045,9 @@ class ZLPreviewView: UIView {
         
         var width = viewW
         
-        if UIApplication.shared.statusBarOrientation.isLandscape {
+      let isLandscape = true
+      // UIApplication.shared.statusBarOrientation.isLandscape
+        if isLandscape {
             let height = viewH
             frame.size.height = height
             
@@ -1095,7 +1097,7 @@ class ZLPreviewView: UIView {
         containerView.frame = frame
         
         var contenSize: CGSize = .zero
-        if UIApplication.shared.statusBarOrientation.isLandscape {
+        if isLandscape {
             contenSize = CGSize(width: width, height: max(viewH, frame.height))
             if frame.height < viewH {
                 containerView.center = CGPoint(x: viewW / 2, y: viewH / 2)
