@@ -378,7 +378,7 @@ class ViewController: UIViewController {
         let result = PHAsset.fetchAssets(with: nil)
         var assets: [ZLPhotoModel] = []
         result.enumerateObjects { asset, index, stop in
-            if index == 10 {
+            if index == 10_000 {
                 stop.pointee = true
                 return
             }

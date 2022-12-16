@@ -51,6 +51,12 @@ class ZLWeakProxy: NSObject {
 
 import Photos
 
+public protocol PhoroPreviewThumbnailCellProtocol: UICollectionViewCell {
+    var whetherSelected: Bool { get set }
+    var whetherFocused: Bool { get set }
+    var photoAsset: PHAsset { get set }
+}
+
 public struct PhotoPreview {
     /// create a preview vc
     /// - Parameters:
@@ -76,7 +82,7 @@ class PhotoPreviewController: UIViewController {
     
     static let colItemSpacing: CGFloat = 40
     
-    static let selPhotoPreviewH: CGFloat = 100
+    static let selPhotoPreviewH: CGFloat = 80
     
     static let previewVCScrollNotification = Notification.Name("previewVCScrollNotification")
     
@@ -127,8 +133,8 @@ class PhotoPreviewController: UIViewController {
     
     private lazy var selectBtn: ZLEnlargeButton = {
         let btn = ZLEnlargeButton(type: .custom)
-        btn.setImage(.zl.getImage("zl_btn_circle"), for: .normal)
-        btn.setImage(.zl.getImage("zl_btn_selected"), for: .selected)
+        btn.setImage(UIImage(named: "ic_checkbox_unselected") ?? .zl.getImage("zl_btn_circle"), for: .normal)
+        btn.setImage(UIImage(named: "ic_checkbox_selected") ?? .zl.getImage("zl_btn_selected"), for: .selected)
         btn.enlargeInset = 10
         btn.addTarget(self, action: #selector(selectBtnClick), for: .touchUpInside)
         return btn
@@ -917,15 +923,22 @@ extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDe
     
 }
 
+
+extension Int {
+    var px: CGFloat {
+        return CGFloat(self) * UIScreen.main.bounds.width / 375
+    }
+}
+
 // MARK: 下方显示的已选择照片列表
 
 class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDragDelegate, UICollectionViewDropDelegate {
     typealias ZLPhotoPreviewSelectedViewCell = PhotoPreviewSelectedViewCell
     private lazy var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
-        layout.itemSize = CGSize(width: 60, height: 60)
+        layout.itemSize = CGSize(width: 40, height: 40)
         layout.minimumLineSpacing = 10
-        layout.minimumInteritemSpacing = 10
+        layout.minimumInteritemSpacing = 12
         layout.scrollDirection = .horizontal
         layout.sectionInset = UIEdgeInsets(top: 10, left: 15, bottom: 10, right: 15)
         
@@ -1122,10 +1135,24 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
         let m = arrSelectedModels[indexPath.row]
         cell.model = m
         
-        if m == currentShowModel {
-            cell.layer.borderWidth = 4
+        let isFocused =  m == currentShowModel
+        let isSelected = m.isSelected
+        
+        if isFocused {
+            cell.imageView.layer.borderWidth = 1
+            cell.hudView.isHidden = true
         } else {
-            cell.layer.borderWidth = 0
+            cell.imageView.layer.borderWidth = 0
+            cell.hudView.isHidden = false
+        }
+        
+        if isSelected {
+            cell.checkmarkImageView.isHidden = false
+            let imageName = isFocused ? "ic_similar_checkmark_blue" : "ic_similar_checkmark"
+            let image = UIImage(named: imageName)
+            cell.checkmarkImageView.image = image ?? .zl.getImage("zl_btn_selected")
+        } else {
+            cell.checkmarkImageView.isHidden = true
         }
         
         return cell
@@ -1150,7 +1177,7 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
 
 class PhotoPreviewSelectedViewCell: UICollectionViewCell {
     
-    private lazy var imageView: UIImageView = {
+    fileprivate lazy var imageView: UIImageView = {
         let view = UIImageView()
         view.contentMode = .scaleAspectFill
         view.clipsToBounds = true
@@ -1171,6 +1198,23 @@ class PhotoPreviewSelectedViewCell: UICollectionViewCell {
         return label
     }()
     
+    
+    fileprivate lazy var hudView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .black.withAlphaComponent(0.5)
+        view.layer.cornerRadius = 8
+        view.layer.masksToBounds = true
+        
+        return view
+    }()
+    
+    fileprivate lazy var checkmarkImageView: UIImageView = {
+        let view = UIImageView()
+        
+        return view
+    }()
+    
+    
     private var imageRequestID: PHImageRequestID = PHInvalidImageRequestID
     
     private var imageIdentifier: String = ""
@@ -1184,11 +1228,29 @@ class PhotoPreviewSelectedViewCell: UICollectionViewCell {
     override init(frame: CGRect) {
         super.init(frame: frame)
         
-        layer.borderColor = UIColor.zl.bottomToolViewBtnNormalBgColorOfPreviewVC.cgColor
+        imageView.layer.cornerRadius = 8
+        imageView.layer.masksToBounds = true
+        imageView.layer.borderColor = UIColor.zl.bottomToolViewBtnNormalBgColorOfPreviewVC.cgColor
         
         contentView.addSubview(imageView)
         contentView.addSubview(tagImageView)
         contentView.addSubview(tagLabel)
+        
+        contentView.addSubview(hudView)
+        hudView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            hudView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            hudView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            hudView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            hudView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+        ])
+        
+        contentView.addSubview(checkmarkImageView)
+        checkmarkImageView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            checkmarkImageView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            checkmarkImageView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+        ])
     }
     
     @available(*, unavailable)
@@ -1199,8 +1261,7 @@ class PhotoPreviewSelectedViewCell: UICollectionViewCell {
     override func layoutSubviews() {
         super.layoutSubviews()
         
-        let value: CGFloat = model.isSelected ? 10 : 0
-        let frame = bounds.inset(by: .init(top: value, left: value, bottom: value, right: value))
+        let frame = bounds
         imageView.frame = frame
         tagImageView.frame = CGRect(x: 5, y: bounds.height - 25, width: 20, height: 20)
         tagLabel.frame = CGRect(x: 5, y: bounds.height - 25, width: bounds.width - 10, height: 20)
@@ -1234,6 +1295,9 @@ class PhotoPreviewSelectedViewCell: UICollectionViewCell {
                 tagLabel.isHidden = true
             }
         }
+        
+        // always hide tagImageView
+        tagImageView.isHidden = true
         
         imageIdentifier = model.ident
         imageView.image = nil
