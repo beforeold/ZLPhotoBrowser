@@ -151,7 +151,15 @@ class PhotoPreviewController: UIViewController {
         label.isHidden = true
         return label
     }()
-    
+  
+    private lazy var titleIndexLabel: UILabel = {
+        let label = UILabel()
+        label.font = UIFont(name: "SFPro-Semibold", size: 17)
+        label.textColor = .white
+        label.textAlignment = .center
+        return label
+    }()
+  
     private lazy var bottomView: UIView = {
         let view = UIView()
         view.backgroundColor = .zl.bottomToolViewBgColorOfPreviewVC
@@ -388,6 +396,13 @@ class PhotoPreviewController: UIViewController {
         
         navView.addSubview(backBtn)
         navView.addSubview(selectBtn)
+        navView.addSubview(titleIndexLabel)
+        titleIndexLabel.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+          titleIndexLabel.centerXAnchor.constraint(equalTo: navView.centerXAnchor),
+          titleIndexLabel.centerYAnchor.constraint(equalTo: backBtn.centerYAnchor),
+        ])
+      
         selectBtn.addSubview(indexLabel)
         view.addSubview(collectionView)
         view.addSubview(bottomView)
@@ -512,6 +527,7 @@ class PhotoPreviewController: UIViewController {
         }
         selectBtn.isSelected = arrDataSources[currentIndex].isSelected
         resetIndexLabelStatus()
+        titleIndexLabel.text = "\(currentIndex + 1)/\(arrDataSources.count)"
         
         guard showBottomViewAndSelectBtn else {
             selectBtn.isHidden = true
