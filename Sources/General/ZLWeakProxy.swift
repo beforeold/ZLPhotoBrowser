@@ -67,12 +67,14 @@ public struct PhotoPreview {
     public static func createPhotoPreviewVC(
         photos: [ZLPhotoModel],
         index: Int = 0,
+        isMenuContextPreview: Bool = false,
         selectionEventCallback: @escaping (ZLPhotoModel) -> Void = { _ in }
     ) -> UINavigationController {
         let vc = PhotoPreviewController(
             photos: photos,
             index: index
         )
+        vc.isMenuContextPreview = isMenuContextPreview
         vc.selectionEventCallback = selectionEventCallback
         return ZLImageNavController(rootViewController: vc)
     }
@@ -159,6 +161,8 @@ class PhotoPreviewController: UIViewController {
         label.textAlignment = .center
         return label
     }()
+  
+    var isMenuContextPreview = false
   
     private lazy var bottomView: UIView = {
         let view = UIView()
@@ -305,6 +309,10 @@ class PhotoPreviewController: UIViewController {
             width: view.frame.width + ZLPhotoPreviewController.colItemSpacing,
             height: getItemHeight()
         )
+      
+        if isMenuContextPreview {
+          collectionView.frame = view.bounds
+        }
         
         backBtn.frame = CGRect(x: insets.left, y: insets.top, width: 60, height: 44)
         selectBtn.frame = CGRect(x: view.frame.width - 40 - insets.right, y: insets.top + (44 - 25) / 2, width: 25, height: 25)
@@ -355,6 +363,7 @@ class PhotoPreviewController: UIViewController {
         // ignore ZLLayout.bottomToolViewH
         bottomViewH = Self.selPhotoPreviewH
         bottomView.layer.masksToBounds = true
+        doneBtn.isHidden = true
         
         bottomView.frame = CGRect(x: 0, y: view.frame.height - insets.bottom - bottomViewH, width: view.frame.width, height: bottomViewH + insets.bottom)
         bottomBlurView?.frame = bottomView.bounds
@@ -564,6 +573,11 @@ class PhotoPreviewController: UIViewController {
            ZLPhotoConfiguration.default().allowSelectImage {
             originalBtn.isHidden = !((currentModel.type == .image) || (currentModel.type == .livePhoto && !config.allowSelectLivePhoto) || (currentModel.type == .gif && !config.allowSelectGif))
         }
+      
+      if isMenuContextPreview {
+        navView.isHidden = true
+        bottomView.isHidden = true
+      }
     }
     
     private func resetIndexLabelStatus() {
@@ -861,7 +875,11 @@ extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDe
     }
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
-        return UIEdgeInsets(top: 0, left: ZLPhotoPreviewController.colItemSpacing / 2, bottom: 0, right: ZLPhotoPreviewController.colItemSpacing / 2)
+      var inset = ZLPhotoPreviewController.colItemSpacing / 2
+      if isMenuContextPreview {
+        inset = 0
+      }
+        return UIEdgeInsets(top: 0, left: inset, bottom: 0, right: inset)
     }
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
@@ -869,6 +887,10 @@ extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDe
     }
     
     func getItemHeight() -> CGFloat {
+        if isMenuContextPreview {
+          return view.bounds.height
+        }
+      
         var insets = UIEdgeInsets(top: 20, left: 0, bottom: 0, right: 0)
         if #available(iOS 11.0, *) {
             insets = self.view.safeAreaInsets
@@ -925,9 +947,6 @@ extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDe
         baseCell.singleTapBlock = { [weak self] in
             self?.tapPreviewCell()
         }
-        
-        let view = baseCell.contentView
-//        view.backgroundColor = collectionViewColor
         
         return baseCell
     }
