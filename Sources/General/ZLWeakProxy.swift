@@ -57,6 +57,8 @@ public protocol PhoroPreviewThumbnailCellProtocol: UICollectionViewCell {
     var photoAsset: PHAsset { get set }
 }
 
+public typealias ZLAssetFromFrameProvider = ((Int) -> CGRect?)?
+
 public struct PhotoPreview {
     /// create a preview vc
     /// - Parameters:
@@ -68,15 +70,18 @@ public struct PhotoPreview {
         photos: [ZLPhotoModel],
         index: Int = 0,
         isMenuContextPreview: Bool = false,
+        fromFrameProvider: ZLAssetFromFrameProvider = nil,
         selectionEventCallback: @escaping (ZLPhotoModel) -> Void = { _ in }
-    ) -> UINavigationController {
+    ) -> UIViewController {
         let vc = PhotoPreviewController(
             photos: photos,
             index: index
         )
         vc.isMenuContextPreview = isMenuContextPreview
         vc.selectionEventCallback = selectionEventCallback
-        return ZLImageNavController(rootViewController: vc)
+        vc.fromFrameProvider = fromFrameProvider
+        
+        return vc
     }
 }
 
@@ -91,8 +96,13 @@ class PhotoPreviewController: UIViewController {
     let arrDataSources: [ZLPhotoModel]
     
     var selectionEventCallback: (ZLPhotoModel) -> Void = { _ in }
+    var fromFrameProvider: ZLAssetFromFrameProvider = nil
     
-    var currentIndex: Int
+    var currentIndex: Int {
+        didSet {
+           popInteractiveTransition?.currentIndex = currentIndex
+        }
+    }
     
     lazy var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
@@ -126,8 +136,10 @@ class PhotoPreviewController: UIViewController {
     private var navBlurView: UIVisualEffectView?
     
     private lazy var backBtn: UIButton = {
-        let btn = UIButton(type: .custom)
-        btn.setImage(.zl.getImage("zl_navBack"), for: .normal)
+        let btn = ZLEnlargeButton(type: .custom)
+        btn.enlargeInset = 5
+        let image: UIImage? = UIImage(named: "ic_left") ?? .zl.getImage("zl_navBack")
+        btn.setImage(image, for: .normal)
         btn.imageEdgeInsets = UIEdgeInsets(top: 0, left: -10, bottom: 0, right: 0)
         btn.addTarget(self, action: #selector(backBtnClick), for: .touchUpInside)
         return btn
@@ -207,7 +219,7 @@ class PhotoPreviewController: UIViewController {
     
     private var hideNavView = false
     
-    private var popInteractiveTransition: ZLPhotoPreviewPopInteractiveTransition?
+    private var popInteractiveTransition: PhotoPreviewPopInteractiveTransition?
     
     private var orientation: UIInterfaceOrientation = .unknown
     
@@ -253,11 +265,12 @@ class PhotoPreviewController: UIViewController {
             .animateSelectBtnWhenSelect(false)
         
         ZLPhotoUIConfiguration.default()
-            .navBarColorOfPreviewVC(UIColor.black)
-            .previewVCBgColor(self.collectionViewColor)
+            .navBarColorOfPreviewVC(collectionViewColor)
+            .previewVCBgColor(collectionViewColor)
+            .bottomToolViewBgColorOfPreviewVC(collectionViewColor)
             .showStatusBarInPreviewInterface(true)
             .statusBarStyle(.lightContent)
-            .bottomToolViewBgColorOfPreviewVC(.black)
+            .navViewBlurEffectOfPreview(nil)
             .bottomViewBlurEffectOfPreview(nil)
         
         setupUI()
@@ -268,7 +281,8 @@ class PhotoPreviewController: UIViewController {
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        navigationController?.navigationBar.isHidden = true
+        
+        navigationController?.setNavigationBarHidden(true, animated: animated)
     }
     
     override func viewDidAppear(_ animated: Bool) {
@@ -279,6 +293,11 @@ class PhotoPreviewController: UIViewController {
         isFirstAppear = false
         
         reloadCurrentCell()
+    }
+    
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        navigationController?.setNavigationBarHidden(false, animated: animated)
     }
     
     override func viewDidLayoutSubviews() {
@@ -351,7 +370,7 @@ class PhotoPreviewController: UIViewController {
         }
         var bottomViewH = ZLLayout.bottomToolViewH
         var showSelPhotoPreview = false
-        if ZLPhotoConfiguration.default().showSelectedPhotoPreview, let nav = navigationController as? ZLImageNavController {
+        if ZLPhotoConfiguration.default().showSelectedPhotoPreview, let nav = navigationController as? ZLImageNavControllerProtocol {
 //            if !nav.arrSelectedModels.isEmpty {
                 showSelPhotoPreview = true
                 bottomViewH += ZLPhotoPreviewController.selPhotoPreviewH
@@ -381,7 +400,7 @@ class PhotoPreviewController: UIViewController {
         let originBtnMaxW = min(btnMaxWidth, originBtnW)
         originalBtn.frame = CGRect(x: (bottomView.bounds.width - originBtnMaxW) / 2 - 5, y: btnY, width: originBtnMaxW, height: btnH)
         
-        let selCount = (navigationController as? ZLImageNavController)?.arrSelectedModels.count ?? 0
+        let selCount = (navigationController as? ZLImageNavControllerProtocol)?.arrSelectedModels.count ?? 0
         var doneTitle = localLanguageTextValue(.done)
         if ZLPhotoConfiguration.default().showSelectCountOnDoneBtn, selCount > 0 {
             doneTitle += "(" + String(selCount) + ")"
@@ -423,7 +442,7 @@ class PhotoPreviewController: UIViewController {
         
         if config.showSelectedPhotoPreview {
             /*
-            let selModels = (navigationController as? ZLImageNavController)?.arrSelectedModels ?? []
+            let selModels = (navigationController as? ZLImageNavControllerProtocol)?.arrSelectedModels ?? []
             selPhotoPreview = PhotoPreviewSelectedView(selModels: selModels, currentShowModel: arrDataSources[currentIndex])
             */
             
@@ -442,7 +461,7 @@ class PhotoPreviewController: UIViewController {
         bottomView.addSubview(editBtn)
         
         originalBtn.isHidden = !(config.allowSelectOriginal && config.allowSelectImage)
-        originalBtn.isSelected = (navigationController as? ZLImageNavController)?.isSelectedOriginal ?? false
+        originalBtn.isSelected = (navigationController as? ZLImageNavControllerProtocol)?.isSelectedOriginal ?? false
         bottomView.addSubview(originalBtn)
         
         bottomView.addSubview(doneBtn)
@@ -471,7 +490,10 @@ class PhotoPreviewController: UIViewController {
             // 仅有当前vc一个时候，说明不是从相册进入，不添加交互动画
             return
         }
-        // popInteractiveTransition = ZLPhotoPreviewPopInteractiveTransition(viewController: self)
+        
+        popInteractiveTransition = PhotoPreviewPopInteractiveTransition(viewController: self)
+        popInteractiveTransition?.currentIndex = currentIndex
+        popInteractiveTransition?.fromFrameProvider = fromFrameProvider
         popInteractiveTransition?.shouldStartTransition = { [weak self] point -> Bool in
             guard let `self` = self else { return false }
             if !self.hideNavView, self.navView.frame.contains(point) || self.bottomView.frame.contains(point) {
@@ -522,7 +544,7 @@ class PhotoPreviewController: UIViewController {
     }
     
     private func resetSubViewStatus() {
-        guard let nav = navigationController as? ZLImageNavController else {
+        guard let nav = navigationController as? ZLImageNavControllerProtocol else {
             zlLoggerInDebug("Navigation controller is null")
             return
         }
@@ -585,7 +607,7 @@ class PhotoPreviewController: UIViewController {
             indexLabel.isHidden = true
             return
         }
-        guard let nav = navigationController as? ZLImageNavController else {
+        guard let nav = navigationController as? ZLImageNavControllerProtocol else {
             zlLoggerInDebug("Navigation controller is null")
             return
         }
@@ -608,7 +630,7 @@ class PhotoPreviewController: UIViewController {
     }
     
     @objc private func selectBtnClick() {
-        guard let nav = navigationController as? ZLImageNavController else {
+        guard let nav = navigationController as? ZLImageNavControllerProtocol else {
             zlLoggerInDebug("Navigation controller is null")
             return
         }
@@ -677,7 +699,7 @@ class PhotoPreviewController: UIViewController {
         
         let config = ZLPhotoConfiguration.default()
         
-        let nav = (navigationController as? ZLImageNavController)
+        let nav = (navigationController as? ZLImageNavControllerProtocol)
         nav?.isSelectedOriginal = originalBtn.isSelected
         if nav?.arrSelectedModels.count == 0 {
             selectBtnClick()
@@ -701,7 +723,7 @@ class PhotoPreviewController: UIViewController {
     }
     
     @objc private func doneBtnClick() {
-        guard let nav = navigationController as? ZLImageNavController else {
+        guard let nav = navigationController as? ZLImageNavControllerProtocol else {
             zlLoggerInDebug("Navigation controller is null")
             return
         }
@@ -743,7 +765,7 @@ class PhotoPreviewController: UIViewController {
     }
     
     private func refreshCurrentCellIndex(_ models: [ZLPhotoModel]) {
-        let nav = navigationController as? ZLImageNavController
+        let nav = navigationController as? ZLImageNavControllerProtocol
         nav?.arrSelectedModels.removeAll()
         nav?.arrSelectedModels.append(contentsOf: models)
         guard ZLPhotoConfiguration.default().showSelectedIndex else {
@@ -771,7 +793,7 @@ class PhotoPreviewController: UIViewController {
     
     private func showEditImageVC(image: UIImage) {
         let model = arrDataSources[currentIndex]
-        let nav = navigationController as? ZLImageNavController
+        let nav = navigationController as? ZLImageNavControllerProtocol
         ZLEditImageViewController.showEditImageVC(parentVC: self, image: image, editModel: model.editImageModel) { [weak self, weak nav] ei, editImageModel in
             guard let `self` = self else { return }
             model.editImage = ei
@@ -789,7 +811,7 @@ class PhotoPreviewController: UIViewController {
     }
     
     private func showEditVideoVC(model: ZLPhotoModel, avAsset: AVAsset) {
-        let nav = navigationController as? ZLImageNavController
+        let nav = navigationController as? ZLImageNavControllerProtocol
         let vc = ZLEditVideoViewController(avAsset: avAsset)
         vc.modalPresentationStyle = .fullScreen
         
@@ -952,13 +974,13 @@ extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDe
     }
     
     var collectionViewColor: UIColor {
-        UIColor(red: 0.184, green: 0.184, blue: 0.184, alpha: 1)
+        let color = UIColor(red: 0.09, green: 0.09, blue: 0.09, alpha: 1)
+        return color
     }
     
     func collectionView(_ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
         (cell as? ZLPreviewBaseCell)?.resetSubViewStatusWhenCellEndDisplay()
     }
-    
 }
 
 
@@ -1352,5 +1374,214 @@ class PhotoPreviewSelectedViewCell: UICollectionViewCell {
         }
         
         
+    }
+}
+
+
+extension ZLImageNavController: ZLImageNavControllerProtocol {
+    
+}
+
+public protocol ZLImageNavControllerProtocol: UINavigationController {
+  
+  var isSelectedOriginal: Bool { get set }
+  
+  var arrSelectedModels: [ZLPhotoModel]  { get set }
+  
+  var selectImageBlock: (() -> Void)? { get set }
+  
+  var cancelBlock: (() -> Void)? { get set }
+  
+}
+
+
+class PhotoPreviewPopInteractiveTransition: UIPercentDrivenInteractiveTransition {
+    typealias ZLPhotoPreviewController = PhotoPreviewController
+    
+    weak var transitionContext: UIViewControllerContextTransitioning?
+    
+    weak var viewController: ZLPhotoPreviewController?
+    
+    var shadowView: UIView?
+    
+    var imageView: UIImageView?
+    
+    var imageViewOriginalFrame: CGRect = .zero
+    
+    var startPanPoint: CGPoint = .zero
+    
+    var interactive: Bool = false
+    
+    var shouldStartTransition: ((CGPoint) -> Bool)?
+  
+    var currentIndex: Int = 0
+    var fromFrameProvider: ZLAssetFromFrameProvider = nil
+    
+    var startTransition: (() -> Void)?
+    
+    var cancelTransition: (() -> Void)?
+    
+    var finishTransition: (() -> Void)?
+    
+    init(viewController: ZLPhotoPreviewController) {
+        super.init()
+        self.viewController = viewController
+        let dismissPan = UIPanGestureRecognizer(target: self, action: #selector(dismissPanAction(_:)))
+        viewController.view.addGestureRecognizer(dismissPan)
+    }
+    
+    @objc func dismissPanAction(_ pan: UIPanGestureRecognizer) {
+        let point = pan.location(in: viewController?.view)
+        
+        if pan.state == .began {
+            guard shouldStartTransition?(point) == true else {
+                interactive = false
+                return
+            }
+            startPanPoint = point
+            interactive = true
+            startTransition?()
+            viewController?.navigationController?.popViewController(animated: true)
+        } else if pan.state == .changed {
+            guard interactive else {
+                return
+            }
+            let result = panResult(pan)
+            imageView?.frame = result.frame
+            shadowView?.alpha = pow(result.scale, 2)
+            
+            update(result.scale)
+        } else if pan.state == .cancelled || pan.state == .ended {
+            guard interactive else {
+                return
+            }
+            
+            let vel = pan.velocity(in: viewController?.view)
+            let p = pan.translation(in: viewController?.view)
+            let percent: CGFloat = max(0.0, p.y / (viewController?.view.bounds.height ?? UIScreen.main.bounds.height))
+            
+            let dismiss = vel.y > 300 || (percent > 0.1 && vel.y > -300)
+            
+            if dismiss {
+                finish()
+            } else {
+                cancel()
+            }
+            imageViewOriginalFrame = .zero
+            startPanPoint = .zero
+            interactive = false
+        }
+    }
+    
+    func panResult(_ pan: UIPanGestureRecognizer) -> (frame: CGRect, scale: CGFloat) {
+        // 拖动偏移量
+        let translation = pan.translation(in: viewController?.view)
+        let currentTouch = pan.location(in: viewController?.view)
+        
+        // 由下拉的偏移值决定缩放比例，越往下偏移，缩得越小。scale值区间[0.3, 1.0]
+        let scale = min(1.0, max(0.3, 1 - translation.y / UIScreen.main.bounds.height))
+        
+        let width = imageViewOriginalFrame.size.width * scale
+        let height = imageViewOriginalFrame.size.height * scale
+        
+        // 计算x和y。保持手指在图片上的相对位置不变。
+        let xRate = (startPanPoint.x - imageViewOriginalFrame.origin.x) / imageViewOriginalFrame.size.width
+        let currentTouchDeltaX = xRate * width
+        let x = currentTouch.x - currentTouchDeltaX
+        
+        let yRate = (startPanPoint.y - imageViewOriginalFrame.origin.y) / imageViewOriginalFrame.size.height
+        let currentTouchDeltaY = yRate * height
+        let y = currentTouch.y - currentTouchDeltaY
+        
+        return (CGRect(x: x.isNaN ? 0 : x, y: y.isNaN ? 0 : y, width: width, height: height), scale)
+    }
+    
+    override func startInteractiveTransition(_ transitionContext: UIViewControllerContextTransitioning) {
+        self.transitionContext = transitionContext
+        startAnimate()
+    }
+    
+    func startAnimate() {
+        guard let transitionContext = transitionContext else {
+            return
+        }
+        
+        guard let fromVC = transitionContext.viewController(forKey: .from) as? ZLPhotoPreviewController,
+              let toVC = transitionContext.viewController(forKey: .to) else {
+                  return
+              }
+        
+        let containerView = transitionContext.containerView
+        containerView.addSubview(toVC.view)
+        
+        guard let cell = fromVC.collectionView.cellForItem(at: IndexPath(row: fromVC.currentIndex, section: 0)) as? ZLPreviewBaseCell else {
+            return
+        }
+        
+        shadowView = UIView(frame: containerView.bounds)
+        shadowView?.backgroundColor = ZLPhotoUIConfiguration.default().previewVCBgColor
+        containerView.addSubview(shadowView!)
+        
+        let fromImageViewFrame = cell.animateImageFrame(convertTo: containerView)
+        
+        imageView = UIImageView(frame: fromImageViewFrame)
+        imageView?.contentMode = .scaleAspectFill
+        imageView?.clipsToBounds = true
+        imageView?.image = cell.currentImage
+        containerView.addSubview(imageView!)
+        
+        imageViewOriginalFrame = imageView!.frame
+    }
+    
+    override func finish() {
+        super.finish()
+        finishAnimate()
+    }
+    
+    func finishAnimate() {
+        guard let transitionContext = transitionContext else {
+            return
+        }
+        
+        let toFrame = self.fromFrameProvider?(currentIndex)
+        
+        UIView.animate(withDuration: 0.25, animations: {
+            if let toFrame = toFrame {
+                self.imageView?.frame = toFrame
+            } else {
+                self.imageView?.alpha = 0
+            }
+            self.shadowView?.alpha = 0
+        }) { _ in
+            self.imageView?.removeFromSuperview()
+            self.shadowView?.removeFromSuperview()
+            self.imageView = nil
+            self.shadowView = nil
+            self.finishTransition?()
+            transitionContext.finishInteractiveTransition()
+            transitionContext.completeTransition(!transitionContext.transitionWasCancelled)
+        }
+    }
+    
+    override func cancel() {
+        super.cancel()
+        cancelAnimate()
+    }
+    
+    func cancelAnimate() {
+        guard let transitionContext = transitionContext else {
+            return
+        }
+        
+        UIView.animate(withDuration: 0.25, animations: {
+            self.imageView?.frame = self.imageViewOriginalFrame
+            self.shadowView?.alpha = 1
+        }) { _ in
+            self.imageView?.removeFromSuperview()
+            self.shadowView?.removeFromSuperview()
+            self.cancelTransition?()
+            transitionContext.cancelInteractiveTransition()
+            transitionContext.completeTransition(!transitionContext.transitionWasCancelled)
+        }
     }
 }
