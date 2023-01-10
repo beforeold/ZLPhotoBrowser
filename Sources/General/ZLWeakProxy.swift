@@ -71,6 +71,7 @@ public struct PhotoPreview {
         index: Int = 0,
         isMenuContextPreview: Bool = false,
         fromFrameProvider: ZLAssetFromFrameProvider = nil,
+        embedsInNavigationController: Bool = false,
         selectionEventCallback: @escaping (ZLPhotoModel) -> Void = { _ in }
     ) -> UIViewController {
         let vc = PhotoPreviewController(
@@ -80,6 +81,10 @@ public struct PhotoPreview {
         vc.isMenuContextPreview = isMenuContextPreview
         vc.selectionEventCallback = selectionEventCallback
         vc.fromFrameProvider = fromFrameProvider
+        
+        if embedsInNavigationController {
+            return ZLImageNavController(rootViewController: vc)
+        }
         
         return vc
     }
@@ -757,7 +762,7 @@ class PhotoPreviewController: UIViewController {
             return
         }
         collectionView.performBatchUpdates({
-            self.collectionView.scrollToItem(at: IndexPath(row: index, section: 0), at: .centeredHorizontally, animated: false)
+            self.collectionView.scrollToItem(at: IndexPath(row: index, section: 0), at: .centeredHorizontally, animated: true)
         }) { _ in
             self.indexBeforOrientationChanged = self.currentIndex
             self.reloadCurrentCell()
