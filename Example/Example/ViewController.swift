@@ -390,7 +390,10 @@ class ViewController: UIViewController {
             assets.append(photo)
         }
         
-        let vc = PhotoPreview.createPhotoPreviewVC(photos: assets)
+        let vc = PhotoPreview.createPhotoPreviewVC(
+            photos: assets,
+            embedsInNavigationController: true
+        )
         show(vc, sender: nil)
     }
 }
