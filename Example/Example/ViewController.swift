@@ -377,8 +377,11 @@ class ViewController: UIViewController {
     @objc func createPhotosPreview() {
         let result = PHAsset.fetchAssets(with: nil)
         var assets: [ZLPhotoModel] = []
-        result.enumerateObjects { asset, index, stop in
-            if index == 10_000 {
+        
+        var count = 0
+        result.enumerateObjects() { asset, index, stop in
+            count += 1
+            if count > 100 {
                 stop.pointee = true
                 return
             }

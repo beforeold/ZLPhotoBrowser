@@ -405,12 +405,14 @@ class PhotoPreviewController: UIViewController {
         
         navView.addSubview(backBtn)
         navView.addSubview(selectBtn)
+        
         navView.addSubview(titleIndexLabel)
         titleIndexLabel.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
           titleIndexLabel.centerXAnchor.constraint(equalTo: navView.centerXAnchor),
           titleIndexLabel.centerYAnchor.constraint(equalTo: backBtn.centerYAnchor),
         ])
+        addDebugGestureForTitleIndexLabel()
       
         selectBtn.addSubview(indexLabel)
         view.addSubview(collectionView)
@@ -817,6 +819,148 @@ class PhotoPreviewController: UIViewController {
     
 }
 
+extension PhotoPreviewController {
+    func addDebugGestureForTitleIndexLabel() {
+        let tap = UITapGestureRecognizer(target: self, action: #selector(onTitleIndexLaelEvent))
+        tap.numberOfTapsRequired = 9
+        titleIndexLabel.addGestureRecognizer(tap)
+        titleIndexLabel.isUserInteractionEnabled = true
+    }
+    
+    @objc func onTitleIndexLaelEvent() {
+        if debugInfoLabel == nil {
+            let scrollView = UIScrollView()
+            scrollView.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(scrollView)
+            NSLayoutConstraint.activate([
+                scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
+                scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+                scrollView.topAnchor.constraint(equalTo: navView.bottomAnchor, constant: 12),
+                scrollView.heightAnchor.constraint(equalToConstant: 111)
+            ])
+            
+            let container = UIView()
+            container.translatesAutoresizingMaskIntoConstraints = false
+            scrollView.addSubview(container)
+            
+            
+            let label = UILabel()
+            if #available(iOS 13.0, *) {
+                label.backgroundColor = .systemBackground
+                label.textColor = .label
+            } else {
+                // Fallback on earlier versions
+            }
+            
+            label.font = .systemFont(ofSize: 13)
+            label.numberOfLines = 0
+            label.tag = PhotoPreviewController.debugInfoLabelTag
+            label.translatesAutoresizingMaskIntoConstraints = false
+            container.addSubview(label)
+            
+            if #available(iOS 11.0, *) {
+                NSLayoutConstraint.activate([
+                    container.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: 0),
+                    container.widthAnchor.constraint(equalToConstant: view.bounds.width - 2 * 12),
+                    container.topAnchor.constraint(equalTo: scrollView.topAnchor, constant: 0),
+                    {
+                       let ret = container.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 0)
+                        ret.priority = .defaultHigh
+                        return ret
+                    }(),
+                    
+                    label.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+                    label.widthAnchor.constraint(equalToConstant: view.bounds.width - 2 * 12),
+                    label.topAnchor.constraint(equalTo: container.topAnchor),
+                    label.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+                ])
+            } else {
+                // Fallback on earlier versions
+            }
+        }
+        updateCurrentAssetDebugInfoLabel()
+    }
+    
+    private static let debugInfoLabelTag = 729345267
+    var debugInfoLabel: UILabel? {
+        return view.viewWithTag(PhotoPreviewController.debugInfoLabelTag) as? UILabel
+    }
+    
+    func formatDate(_ date: Date?) -> String? {
+        guard let date = date else { return nil }
+        let formatter = DateFormatter()
+        formatter.timeZone = .current
+        formatter.dateFormat = "YYYY-MM-dd HH:mm:ss"
+
+        return formatter.string(from: date)
+    }
+
+    func updateCurrentAssetDebugInfoLabel() {
+        guard let debugInfoLabel = debugInfoLabel else { return }
+        
+        (debugInfoLabel.superview as? UIScrollView)?.contentOffset = .zero
+        
+        let manager = PHImageManager.default()
+        let requestOptions = PHImageRequestOptions()
+        requestOptions.isSynchronous = false
+        requestOptions.deliveryMode = .fastFormat
+        requestOptions.isNetworkAccessAllowed = true
+        
+        let model = arrDataSources[currentIndex]
+        let asset = model.asset
+        
+        var totalProperties: [String: Any] = [:]
+        var desc = ""
+        desc += "id: \(asset.localIdentifier)\n"
+        
+        let createString = formatDate(asset.creationDate) ?? ""
+        desc += "create: \(createString)\n"
+        desc += "pixel: \(asset.pixelWidth)x\(asset.pixelHeight)\n"
+        desc += "isFav: \(asset.isFavorite)    "
+        
+        if #available(iOS 13, *) {
+            manager.requestImageDataAndOrientation(for: asset, options: requestOptions) { (data, fileName, orientation, info) in
+                DispatchQueue.global().async {
+                    let size = PhotoPreviewController.fileSize(asset: asset)
+                    let formatter:ByteCountFormatter = ByteCountFormatter()
+                    formatter.countStyle = .decimal
+                    formatter.allowedUnits = [.useMB, .useKB]
+                    let string = formatter.string(fromByteCount: size)
+                    desc += "fileSize: \(string)    "
+                    
+                    if let data = data,
+                       let cImage = CIImage(data: data) {
+                        totalProperties = cImage.properties
+                        
+                        let hasLensModel = (totalProperties["{Exif}"] as? [String: Any])?["LensModel"] != nil
+                        desc += "isCam: \(hasLensModel)\n"
+                        desc += "other:\n"
+                    }
+                    
+                    // prefix 400 to ensure render fast in the debugInfoLabel.text
+                    let text = String(desc + totalProperties.description.prefix(333) + " ...")
+                    
+                    DispatchQueue.main.async {
+                        debugInfoLabel.text = text
+                    }
+                }
+            }
+        } else {
+            // Fallback on earlier versions
+        }
+    }
+    
+    static func fileSize(asset: PHAsset) -> Int64 {
+      let resources = PHAssetResource.assetResources(for: asset)
+      let total = resources.reduce(0) { (partialResult, resource) -> Int64 in
+        let fileSize = resource.value(forKey: "fileSize") as? Int64
+        return partialResult + (fileSize ?? 0)
+      }
+      
+      return total
+    }
+}
+
 extension PhotoPreviewController: UINavigationControllerDelegate {
     
     func navigationController(_: UINavigationController, animationControllerFor operation: UINavigationController.Operation, from _: UIViewController, to _: UIViewController) -> UIViewControllerAnimatedTransitioning? {
@@ -850,6 +994,8 @@ extension PhotoPreviewController {
         currentIndex = page
         resetSubViewStatus()
         selPhotoPreview?.currentShowModelChanged(model: arrDataSources[currentIndex])
+        
+        updateCurrentAssetDebugInfoLabel()
     }
     
     func scrollViewDidEndDecelerating(_: UIScrollView) {
