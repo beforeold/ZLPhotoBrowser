@@ -375,7 +375,10 @@ class ViewController: UIViewController {
     }
     
     @objc func createPhotosPreview() {
-        let result = PHAsset.fetchAssets(with: nil)
+        let options = PHFetchOptions()
+        options.predicate = NSPredicate(format: "mediaType == %ld", PHAssetMediaType.image.rawValue)
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        let result = PHAsset.fetchAssets(with: options)
         var assets: [ZLPhotoModel] = []
         
         var count = 0
