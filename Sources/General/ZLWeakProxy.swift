@@ -51,6 +51,10 @@ class ZLWeakProxy: NSObject {
 
 import Photos
 
+private func clamp(_ minValue: Int, _ value: Int, _ maxValue: Int) -> Int {
+    return max(minValue, min(value, maxValue))
+}
+
 public protocol PhoroPreviewThumbnailCellProtocol: UICollectionViewCell {
     var whetherSelected: Bool { get set }
     var whetherFocused: Bool { get set }
@@ -131,6 +135,8 @@ class PhotoPreviewController: UIViewController {
     private let showBottomViewAndSelectBtn: Bool
     
     private var indexBeforOrientationChanged: Int
+    
+    private var ignoresDidScroll = false
     
     private lazy var navView: UIView = {
         let view = UIView()
@@ -375,7 +381,9 @@ class PhotoPreviewController: UIViewController {
         }
         var bottomViewH = ZLLayout.bottomToolViewH
         var showSelPhotoPreview = false
-        if ZLPhotoConfiguration.default().showSelectedPhotoPreview, let nav = navigationController as? ZLImageNavControllerProtocol {
+        if ZLPhotoConfiguration.default().showSelectedPhotoPreview
+//            , let nav = navigationController as? ZLImageNavControllerProtocol
+        {
 //            if !nav.arrSelectedModels.isEmpty {
                 showSelPhotoPreview = true
                 bottomViewH += ZLPhotoPreviewController.selPhotoPreviewH
@@ -456,8 +464,17 @@ class PhotoPreviewController: UIViewController {
             selPhotoPreview = PhotoPreviewSelectedView(selModels: self.arrDataSources, currentShowModel: arrDataSources[currentIndex])
             
             selPhotoPreview?.selectBlock = { [weak self] model in
+                self?.handleSelectEvent(model: model)
+            }
+            
+            selPhotoPreview?.scrollPositionBlock = { [weak self] model in
                 self?.scrollToSelPreviewCell(model)
             }
+            
+            selPhotoPreview?.ignoresDidScrollCallbackForOther = { [weak self] ignoresDidScrollCallbackForOther in
+                self?.ignoresDidScroll = ignoresDidScrollCallbackForOther
+            }
+            
             selPhotoPreview?.endSortBlock = { [weak self] models in
                 self?.refreshCurrentCellIndex(models)
             }
@@ -550,6 +567,9 @@ class PhotoPreviewController: UIViewController {
         }
     }
     
+    /// reset subview status including:
+    /// navView, selectBtn, indexLabel, titleIndexLabel
+    /// buttomView, editBtn, originalBtn, doneBtn
     private func resetSubViewStatus() {
         guard let nav = navigationController as? ZLImageNavControllerProtocol else {
             zlLoggerInDebug("Navigation controller is null")
@@ -637,20 +657,22 @@ class PhotoPreviewController: UIViewController {
     }
     
     @objc private func selectBtnClick() {
+        let currentModel = arrDataSources[currentIndex]
+        handleSelectEvent(model: currentModel)
+    }
+    
+    private func handleSelectEvent(model: ZLPhotoModel) {
         guard let nav = navigationController as? ZLImageNavControllerProtocol else {
             zlLoggerInDebug("Navigation controller is null")
             return
         }
-        let currentModel = arrDataSources[currentIndex]
-        selectBtn.layer.removeAllAnimations()
+        
+        let currentModel = model
         if currentModel.isSelected {
             currentModel.isSelected = false
             nav.arrSelectedModels.removeAll { $0 == currentModel }
             selPhotoPreview?.removeSelModel(model: currentModel)
         } else {
-            if ZLPhotoConfiguration.default().animateSelectBtnWhenSelect {
-                selectBtn.layer.add(getSpringAnimation(), forKey: nil)
-            }
             if !canAddModel(currentModel, currentSelectCount: nav.arrSelectedModels.count, sender: self) {
                 return
             }
@@ -660,6 +682,13 @@ class PhotoPreviewController: UIViewController {
         }
         selectionEventCallback(currentModel)
         resetSubViewStatus()
+    }
+    
+    private func updateCurrentIndex(_ index: Int) {
+        currentIndex = index
+        
+        resetSubViewStatus()
+        updateCurrentAssetDebugInfoLabel()
     }
     
     @objc private func editBtnClick() {
@@ -763,12 +792,22 @@ class PhotoPreviewController: UIViewController {
         guard let index = arrDataSources.lastIndex(of: model) else {
             return
         }
+        
+        if index == currentIndex { return }
+        
+        updateCurrentIndex(index)
+        collectionView.scrollToItem(at: IndexPath(row: index, section: 0), at: .centeredHorizontally, animated: false)
+        indexBeforOrientationChanged = self.currentIndex
+        reloadCurrentCell()
+        
+        /*
         collectionView.performBatchUpdates({
             self.collectionView.scrollToItem(at: IndexPath(row: index, section: 0), at: .centeredHorizontally, animated: true)
         }) { _ in
             self.indexBeforOrientationChanged = self.currentIndex
             self.reloadCurrentCell()
         }
+        */
     }
     
     private func refreshCurrentCellIndex(_ models: [ZLPhotoModel]) {
@@ -1006,26 +1045,31 @@ extension PhotoPreviewController: UINavigationControllerDelegate {
 // MARK: scroll view delegate
 
 extension PhotoPreviewController {
-    
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        guard scrollView == collectionView else {
+        if ignoresDidScroll {
             return
         }
+        
         NotificationCenter.default.post(name: ZLPhotoPreviewController.previewVCScrollNotification, object: nil)
+        
         let offset = scrollView.contentOffset
         var page = Int(round(offset.x / (view.bounds.width + ZLPhotoPreviewController.colItemSpacing)))
-        page = max(0, min(page, arrDataSources.count - 1))
+        page = clamp(0, page, arrDataSources.count - 1)
         if page == currentIndex {
             return
         }
-        currentIndex = page
-        resetSubViewStatus()
-        selPhotoPreview?.currentShowModelChanged(model: arrDataSources[currentIndex])
         
-        updateCurrentAssetDebugInfoLabel()
+        updateCurrentIndex(page)
+        selPhotoPreview?.currentShowModelChanged(model: arrDataSources[currentIndex])
+    }
+    
+    func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        selPhotoPreview?.ignoresDidScroll = true
     }
     
     func scrollViewDidEndDecelerating(_: UIScrollView) {
+        selPhotoPreview?.ignoresDidScroll = false
+        
         indexBeforOrientationChanged = currentIndex
         let cell = collectionView.cellForItem(at: IndexPath(row: currentIndex, section: 0))
         if let cell = cell as? ZLGifPreviewCell {
@@ -1144,14 +1188,17 @@ extension Int {
 // MARK: 下方显示的已选择照片列表
 
 class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDragDelegate, UICollectionViewDropDelegate {
+    static let itemLength: CGFloat = 40
+    static var insetLength: CGFloat = UIScreen.main.bounds.width * 0.5 - itemLength * 0.5
+    static let minimumSpacing: CGFloat = 12
     typealias ZLPhotoPreviewSelectedViewCell = PhotoPreviewSelectedViewCell
     private lazy var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
-        layout.itemSize = CGSize(width: 40, height: 40)
-        layout.minimumLineSpacing = 10
-        layout.minimumInteritemSpacing = 12
+        layout.itemSize = CGSize(width: Self.itemLength, height: Self.itemLength)
+        layout.minimumLineSpacing = Self.minimumSpacing
+        layout.minimumInteritemSpacing = Self.minimumSpacing
         layout.scrollDirection = .horizontal
-        layout.sectionInset = UIEdgeInsets(top: 10, left: 15, bottom: 10, right: 15)
+        layout.sectionInset = UIEdgeInsets(top: 10, left: Self.insetLength, bottom: 10, right: Self.insetLength)
         
         let view = UICollectionView(frame: .zero, collectionViewLayout: layout)
         view.backgroundColor = .clear
@@ -1180,7 +1227,12 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
     
     private var isDraging = false
     
+    var ignoresDidScroll = false
+    
+    /// callback on didSelect item
     var selectBlock: ((ZLPhotoModel) -> Void)?
+    var scrollPositionBlock: (ZLPhotoModel) -> Void = { _ in }
+    var ignoresDidScrollCallbackForOther: (Bool) -> Void = { _ in }
     
     var endSortBlock: (([ZLPhotoModel]) -> Void)?
     
@@ -1206,8 +1258,24 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
         
         collectionView.frame = CGRect(x: 0, y: 10, width: bounds.width, height: 80)
         if let index = arrSelectedModels.firstIndex(where: { $0 == self.currentShowModel }) {
-            collectionView.scrollToItem(at: IndexPath(row: index, section: 0), at: .centeredHorizontally, animated: true)
+            collectionView.scrollToItem(at: IndexPath(row: index, section: 0), at: .centeredHorizontally, animated: false)
         }
+        
+#if DEBUG
+        let tag = 333
+        let width: CGFloat = 2
+        let view: UIView
+        if viewWithTag(tag) != nil {
+            view = viewWithTag(tag)!
+        } else {
+            view = UIView()
+        }
+        view.tag = tag
+        view.backgroundColor = .yellow
+        view.frame = CGRect(x: (self.bounds.width - width) * 0.5, y: 0, width: width, height: self.bounds.height)
+        
+        self.addSubview(view)
+#endif
     }
     
     func currentShowModelChanged(model: ZLPhotoModel) {
@@ -1239,7 +1307,6 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
     
     func removeSelModel(model: ZLPhotoModel) {
         refreshCell(for: model)
-        return
         /*
         guard let index = arrSelectedModels.firstIndex(where: { $0 == model }) else {
             return
@@ -1346,21 +1413,14 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
         let m = arrSelectedModels[indexPath.row]
         cell.model = m
         
-        let isFocused =  m == currentShowModel
         let isSelected = m.isSelected
         
-        if isFocused {
-            cell.imageView.layer.borderWidth = 1
-            cell.hudView.isHidden = true
-        } else {
-            cell.imageView.layer.borderWidth = 0
-            cell.hudView.isHidden = false
-        }
+        cell.imageView.layer.borderWidth = 0
+        cell.hudView.isHidden = !isSelected
         
         if isSelected {
             cell.checkmarkImageView.isHidden = false
-            let imageName = isFocused ? "ic_similar_checkmark_blue" : "ic_similar_checkmark"
-            let image = UIImage(named: imageName)
+            let image = UIImage(named: "ic_similar_checkmark")
             cell.checkmarkImageView.image = image ?? .zl.getImage("zl_btn_selected")
         } else {
             cell.checkmarkImageView.isHidden = true
@@ -1375,14 +1435,54 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
         }
         let m = arrSelectedModels[indexPath.row]
         currentShowModel = m
+        selectBlock?(m)
+        collectionView.reloadItems(at: [indexPath])
+        
+        /*
         collectionView.performBatchUpdates({
             self.collectionView.scrollToItem(at: indexPath, at: .centeredHorizontally, animated: true)
         }) { _ in
             self.collectionView.reloadItems(at: self.collectionView.indexPathsForVisibleItems)
         }
         selectBlock?(m)
+        */
     }
     
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        if ignoresDidScroll {
+            return
+        }
+        
+        let index = properIndexForRestPosition(offset: scrollView.contentOffset)
+        let model = arrSelectedModels[index]
+        scrollPositionBlock(model)
+    }
+    
+    func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        ignoresDidScrollCallbackForOther(true)
+    }
+    
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        ignoresDidScrollCallbackForOther(false)
+    }
+    
+    func scrollViewWillEndDragging(_ scrollView: UIScrollView, withVelocity velocity: CGPoint, targetContentOffset: UnsafeMutablePointer<CGPoint>) {
+        let index = properIndexForRestPosition(offset: targetContentOffset.pointee)
+        targetContentOffset.pointee.x = Double(index) * (Self.itemLength + Self.minimumSpacing)
+    }
+    
+    /// find proper index to rest the scroll view at current offset
+    func properIndexForRestPosition(offset: CGPoint) -> Int {
+        let value = Int(offset.x)
+        let base = Int(Self.itemLength + Self.minimumSpacing)
+        var page = value / base
+        let leftValue = value % base
+        if leftValue > base / 2 {
+            page += 1
+        }
+
+        return clamp(0, page, arrSelectedModels.count - 1)
+    }
 }
 
 

@@ -43,6 +43,7 @@ class ViewController: UIViewController {
             btn.backgroundColor = .black
             btn.layer.cornerRadius = 5
             btn.layer.masksToBounds = true
+            btn.contentEdgeInsets = .init(top: 5, left: 5, bottom: 5, right: 5)
             return btn
         }
         
@@ -55,7 +56,7 @@ class ViewController: UIViewController {
                 make.top.equalTo(topLayoutGuide.snp.bottom).offset(20)
             }
             
-            make.left.equalToSuperview().offset(30)
+            make.left.equalToSuperview().offset(12)
         }
         
         let configBtn_cn = createBtn("相册配置 (中文)", #selector(cn_configureClick))
@@ -100,7 +101,7 @@ class ViewController: UIViewController {
             make.top.equalTo(cameraBtn.snp.bottom).offset(20)
         }
         
-        let photoPreviewButton = createBtn("Photo Preview", #selector(createPhotosPreview))
+        let photoPreviewButton = createBtn("Photo Preview", #selector(onCreatePhotosPreview))
         photoPreviewButton.backgroundColor = .darkGray
         view.addSubview(photoPreviewButton)
         photoPreviewButton.snp.makeConstraints { make in
@@ -374,17 +375,18 @@ class ViewController: UIViewController {
         show(vc, sender: nil)
     }
     
-    @objc func createPhotosPreview() {
+    @objc func onCreatePhotosPreview() {
         let options = PHFetchOptions()
         options.predicate = NSPredicate(format: "mediaType == %ld", PHAssetMediaType.image.rawValue)
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         let result = PHAsset.fetchAssets(with: options)
         var assets: [ZLPhotoModel] = []
         
+        let limit = 20
         var count = 0
-        result.enumerateObjects() { asset, index, stop in
+        result.enumerateObjects(options: .reverse) { asset, index, stop in
             count += 1
-            if count > 100 {
+            if count > limit {
                 stop.pointee = true
                 return
             }
@@ -395,6 +397,7 @@ class ViewController: UIViewController {
         
         let vc = PhotoPreview.createPhotoPreviewVC(
             photos: assets,
+            index: (0..<limit).randomElement()!,
             embedsInNavigationController: true
         )
         show(vc, sender: nil)
