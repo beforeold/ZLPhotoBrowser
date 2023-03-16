@@ -1260,22 +1260,6 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
         if let index = arrSelectedModels.firstIndex(where: { $0 == self.currentShowModel }) {
             collectionView.scrollToItem(at: IndexPath(row: index, section: 0), at: .centeredHorizontally, animated: false)
         }
-        
-#if DEBUG
-        let tag = 333
-        let width: CGFloat = 2
-        let view: UIView
-        if viewWithTag(tag) != nil {
-            view = viewWithTag(tag)!
-        } else {
-            view = UIView()
-        }
-        view.tag = tag
-        view.backgroundColor = .yellow
-        view.frame = CGRect(x: (self.bounds.width - width) * 0.5, y: 0, width: width, height: self.bounds.height)
-        
-        self.addSubview(view)
-#endif
     }
     
     func currentShowModelChanged(model: ZLPhotoModel) {
