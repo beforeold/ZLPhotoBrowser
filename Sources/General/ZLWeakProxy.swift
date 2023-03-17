@@ -288,6 +288,14 @@ class PhotoPreviewController: UIViewController {
         
         addPopInteractiveTransition()
         resetSubViewStatus()
+      
+      setupGestureDepend(on: collectionView)
+    }
+  
+    fileprivate func setupGestureDepend(on scrollView: UIScrollView) {
+        if let navPan = navigationController?.interactivePopGestureRecognizer {
+            collectionView.panGestureRecognizer.require(toFail: navPan)
+        }
     }
     
     override func viewWillAppear(_ animated: Bool) {
