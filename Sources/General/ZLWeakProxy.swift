@@ -1216,6 +1216,8 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
         view.alwaysBounceHorizontal = true
         ZLPhotoPreviewSelectedViewCell.zl.register(view)
         
+        // no need for reordering, thus disable drag interaction
+        /*
         if #available(iOS 11.0, *) {
             view.dragDelegate = self
             view.dropDelegate = self
@@ -1225,6 +1227,7 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
             let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(longPressAction))
             view.addGestureRecognizer(longPressGesture)
         }
+        */
         
         return view
     }()
