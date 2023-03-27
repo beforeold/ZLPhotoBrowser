@@ -94,6 +94,42 @@ public struct PhotoPreview {
     }
 }
 
+public protocol AppTracking {
+    
+    /// track event
+    /// - Parameters:
+    ///   - event: the event name
+    ///   - alternativeEvent: the alternativeEvent if any
+    ///   - action: the action name
+    ///   - properties: the properties
+    ///   - platformOptions: specify  platfor nams if needed
+    func trackEvent(
+      event: String,
+      alternativeEvent: String?,
+      action: String?,
+      properties: [String: Any],
+      platformOptions: [String]?
+    )
+}
+
+extension PhotoPreview {
+    public static var appTracker: AppTracking?
+    
+    static func trackEvent(
+        event: String,
+        action: String,
+        properties: [String: Any] = [:]
+    ) {
+        appTracker?.trackEvent(
+            event: event,
+            alternativeEvent: nil,
+            action: action,
+            properties: properties,
+            platformOptions: nil
+        )
+    }
+}
+
 class PhotoPreviewController: UIViewController {
     
     static let colItemSpacing: CGFloat = 40
@@ -473,6 +509,14 @@ class PhotoPreviewController: UIViewController {
             
             selPhotoPreview?.selectBlock = { [weak self] model in
                 self?.handleSelectEvent(model: model)
+                
+                let action = "click_photo_preview_detail_select"
+                PhotoPreview.trackEvent(event: "Clean", action: action)
+            }
+            
+            selPhotoPreview?.endDraggingBlock = {
+                let action = "click_photo_preview_detail_silde"
+                PhotoPreview.trackEvent(event: "Clean", action: action)
             }
             
             selPhotoPreview?.scrollPositionBlock = { [weak self] model in
@@ -1242,8 +1286,15 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
     
     /// callback on didSelect item
     var selectBlock: ((ZLPhotoModel) -> Void)?
+    
+    /// scroll position changed callback
     var scrollPositionBlock: (ZLPhotoModel) -> Void = { _ in }
+    
+    /// ignores other scroll callback when this view is dragging
     var ignoresDidScrollCallbackForOther: (Bool) -> Void = { _ in }
+    
+    /// callback when end dragging
+    var endDraggingBlock: () -> Void = { }
     
     var endSortBlock: (([ZLPhotoModel]) -> Void)?
     
@@ -1455,6 +1506,10 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
     
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         ignoresDidScrollCallbackForOther(true)
+    }
+    
+    func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        endDraggingBlock()
     }
     
     func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
