@@ -76,7 +76,9 @@ public struct PhotoPreview {
         isMenuContextPreview: Bool = false,
         fromFrameProvider: ZLAssetFromFrameProvider = nil,
         embedsInNavigationController: Bool = false,
-        selectionEventCallback: @escaping (ZLPhotoModel) -> Void = { _ in }
+        selectionEventCallback: @escaping (ZLPhotoModel) -> Void = { _ in },
+        removingReason: String? = nil,
+        removingItemCallback: @escaping ( _ reason: String, _ model: ZLPhotoModel) -> Void = { _, _ in }
     ) -> UIViewController {
         let vc = PhotoPreviewController(
             photos: photos,
@@ -85,6 +87,8 @@ public struct PhotoPreview {
         vc.isMenuContextPreview = isMenuContextPreview
         vc.selectionEventCallback = selectionEventCallback
         vc.fromFrameProvider = fromFrameProvider
+        vc.removingReason = removingReason
+        vc.removingItemCallback = removingItemCallback
         
         if embedsInNavigationController {
             return ZLImageNavController(rootViewController: vc)
@@ -138,10 +142,13 @@ class PhotoPreviewController: UIViewController {
     
     static let previewVCScrollNotification = Notification.Name("previewVCScrollNotification")
     
-    let arrDataSources: [ZLPhotoModel]
+    var arrDataSources: [ZLPhotoModel]
     
     var selectionEventCallback: (ZLPhotoModel) -> Void = { _ in }
     var fromFrameProvider: ZLAssetFromFrameProvider = nil
+    
+    var removingReason: String?
+    var removingItemCallback: ( _ reason: String, _ model: ZLPhotoModel) -> Void = { _, _ in }
     
     var currentIndex: Int {
         didSet {
@@ -227,6 +234,21 @@ class PhotoPreviewController: UIViewController {
         let view = UIView()
         view.backgroundColor = .zl.bottomToolViewBgColorOfPreviewVC
         return view
+    }()
+    
+    private lazy var keepButton: UIButton = {
+        let title = NSLocalizedString("keep", comment: "")
+        let image = UIImage.zl.getImage("ic_star_sparkle_filled_16")
+        
+        let button = UIButton(type: .custom)
+        button.addTarget(self, action: #selector(onKeepButtonEvent), for: .touchUpInside)
+        button.setTitle(title, for: .normal)
+        button.setImage(image, for: .normal)
+        button.titleEdgeInsets = . init(top: 0, left: 8, bottom: 0, right: 0)
+        button.contentEdgeInsets = .init(top: 4, left: 8, bottom: 4, right: 12)
+        button.backgroundColor = UIColor(white: 1.0, alpha: 0.2)
+        
+        return button
     }()
     
     private var bottomBlurView: UIVisualEffectView?
@@ -325,7 +347,7 @@ class PhotoPreviewController: UIViewController {
         addPopInteractiveTransition()
         resetSubViewStatus()
       
-      setupGestureDepend(on: collectionView)
+        setupGestureDepend(on: collectionView)
     }
   
     fileprivate func setupGestureDepend(on scrollView: UIScrollView) {
@@ -472,6 +494,8 @@ class PhotoPreviewController: UIViewController {
         
         let config = ZLPhotoConfiguration.default()
         
+        
+        // - navView
         view.addSubview(navView)
         
         if let effect = ZLPhotoUIConfiguration.default().navViewBlurEffectOfPreview {
@@ -491,7 +515,11 @@ class PhotoPreviewController: UIViewController {
         addDebugGestureForTitleIndexLabel()
       
         selectBtn.addSubview(indexLabel)
+        
+        // - collectionView
         view.addSubview(collectionView)
+        
+        // - bottomView
         view.addSubview(bottomView)
         
         if let effect = ZLPhotoUIConfiguration.default().bottomViewBlurEffectOfPreview {
@@ -541,6 +569,16 @@ class PhotoPreviewController: UIViewController {
         bottomView.addSubview(originalBtn)
         
         bottomView.addSubview(doneBtn)
+        
+        // - overlay
+        if let reason = removingReason, reason == "keep" {
+            view.addSubview(keepButton)
+            keepButton.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                keepButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
+                keepButton.bottomAnchor.constraint(equalTo: bottomView.topAnchor, constant: -20),
+            ])
+        }
         
         view.bringSubviewToFront(navView)
     }
@@ -706,6 +744,18 @@ class PhotoPreviewController: UIViewController {
         if vc == nil {
             navigationController?.dismiss(animated: true, completion: nil)
         }
+    }
+    
+    @objc private func onKeepButtonEvent() {
+        let currentModel = arrDataSources[currentIndex]
+        
+        arrDataSources.remove(at: currentIndex)
+        collectionView.deleteItems(at: [IndexPath(item: currentIndex, section: 0)])
+        
+        let nav = navigationController as? ZLImageNavControllerProtocol
+        nav?.arrSelectedModels.removeAll { $0 == currentModel }
+        
+        selPhotoPreview?.removeModel(model: currentModel)
     }
     
     @objc private func selectBtnClick() {
@@ -1353,13 +1403,14 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
     
     func removeSelModel(model: ZLPhotoModel) {
         refreshCell(for: model)
-        /*
+    }
+    
+    func removeModel(model: ZLPhotoModel) {
         guard let index = arrSelectedModels.firstIndex(where: { $0 == model }) else {
             return
         }
         arrSelectedModels.remove(at: index)
         collectionView.deleteItems(at: [IndexPath(row: index, section: 0)])
-        */
     }
     
     func refreshCell(for model: ZLPhotoModel) {

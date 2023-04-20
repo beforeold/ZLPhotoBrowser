@@ -398,8 +398,11 @@ class ViewController: UIViewController {
         let vc = PhotoPreview.createPhotoPreviewVC(
             photos: assets,
             index: (0..<limit).randomElement()!,
-            embedsInNavigationController: true
-        )
+            embedsInNavigationController: true,
+            removingReason: "keep") { reason, model in
+                print("removingCallback", reason, model)
+            }
+        
         show(vc, sender: nil)
     }
 }
