@@ -55,12 +55,6 @@ private func clamp(_ minValue: Int, _ value: Int, _ maxValue: Int) -> Int {
     return max(minValue, min(value, maxValue))
 }
 
-public protocol PhoroPreviewThumbnailCellProtocol: UICollectionViewCell {
-    var whetherSelected: Bool { get set }
-    var whetherFocused: Bool { get set }
-    var photoAsset: PHAsset { get set }
-}
-
 public typealias ZLAssetFromFrameProvider = ((Int) -> CGRect?)?
 
 public struct PhotoPreview {
@@ -74,11 +68,12 @@ public struct PhotoPreview {
         photos: [ZLPhotoModel],
         index: Int = 0,
         isMenuContextPreview: Bool = false,
-        fromFrameProvider: ZLAssetFromFrameProvider = nil,
         embedsInNavigationController: Bool = false,
-        selectionEventCallback: @escaping (ZLPhotoModel) -> Void = { _ in },
         removingReason: String? = nil,
-        removingItemCallback: @escaping ( _ reason: String, _ model: ZLPhotoModel) -> Void = { _, _ in }
+        selectionEventCallback: @escaping (ZLPhotoModel) -> Void,
+        fromFrameProvider: ZLAssetFromFrameProvider = nil,
+        removingItemCallback: ((_ reason: String, _ model: ZLPhotoModel) -> Void)? = nil,
+        removingAllCallback: (() -> Void)? = nil
     ) -> UIViewController {
         let vc = PhotoPreviewController(
             photos: photos,
@@ -89,6 +84,7 @@ public struct PhotoPreview {
         vc.fromFrameProvider = fromFrameProvider
         vc.removingReason = removingReason
         vc.removingItemCallback = removingItemCallback
+        vc.removingAllCallback = removingAllCallback
         
         if embedsInNavigationController {
             return ZLImageNavController(rootViewController: vc)
@@ -148,10 +144,14 @@ class PhotoPreviewController: UIViewController {
     var fromFrameProvider: ZLAssetFromFrameProvider = nil
     
     var removingReason: String?
-    var removingItemCallback: ( _ reason: String, _ model: ZLPhotoModel) -> Void = { _, _ in }
+    var removingItemCallback: ((_ reason: String, _ model: ZLPhotoModel) -> Void)?
+    var removingAllCallback: (() -> Void)?
     
     var currentIndex: Int {
         didSet {
+#if DEBUG
+            print("currentIndex", currentIndex)
+#endif
            popInteractiveTransition?.currentIndex = currentIndex
         }
     }
@@ -238,15 +238,17 @@ class PhotoPreviewController: UIViewController {
     
     private lazy var keepButton: UIButton = {
         let title = NSLocalizedString("keep", comment: "")
-        let image = UIImage.zl.getImage("ic_star_sparkle_filled_16")
+        let image = UIImage(named: "ic_star_sparkle_filled_16")
         
-        let button = UIButton(type: .custom)
-        button.addTarget(self, action: #selector(onKeepButtonEvent), for: .touchUpInside)
-        button.setTitle(title, for: .normal)
-        button.setImage(image, for: .normal)
+        let button = SpacingButton(type: .custom)
         button.titleEdgeInsets = . init(top: 0, left: 8, bottom: 0, right: 0)
         button.contentEdgeInsets = .init(top: 4, left: 8, bottom: 4, right: 12)
         button.backgroundColor = UIColor(white: 1.0, alpha: 0.2)
+        button.layer.cornerRadius = 15
+        button.titleLabel?.font = UIFont(name: "SFPro", size: 13)
+        button.addTarget(self, action: #selector(onKeepButtonEvent), for: .touchUpInside)
+        button.setTitle(title, for: .normal)
+        button.setImage(image, for: .normal)
         
         return button
     }()
@@ -548,7 +550,7 @@ class PhotoPreviewController: UIViewController {
             }
             
             selPhotoPreview?.scrollPositionBlock = { [weak self] model in
-                self?.scrollToSelPreviewCell(model)
+                self?.onSelPhotoPreviewScrollPositionBlock(model)
             }
             
             selPhotoPreview?.ignoresDidScrollCallbackForOther = { [weak self] ignoresDidScrollCallbackForOther in
@@ -577,6 +579,7 @@ class PhotoPreviewController: UIViewController {
             NSLayoutConstraint.activate([
                 keepButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
                 keepButton.bottomAnchor.constraint(equalTo: bottomView.topAnchor, constant: -20),
+                keepButton.heightAnchor.constraint(equalToConstant: 2 * 15),
             ])
         }
         
@@ -661,6 +664,10 @@ class PhotoPreviewController: UIViewController {
     /// navView, selectBtn, indexLabel, titleIndexLabel
     /// buttomView, editBtn, originalBtn, doneBtn
     private func resetSubViewStatus() {
+        if arrDataSources.isEmpty {
+            return
+        }
+        
         guard let nav = navigationController as? ZLImageNavControllerProtocol else {
             zlLoggerInDebug("Navigation controller is null")
             return
@@ -739,6 +746,10 @@ class PhotoPreviewController: UIViewController {
     // MARK: btn actions
     
     @objc private func backBtnClick() {
+        handleBackEvent()
+    }
+    
+    private func handleBackEvent() {
         backBlock?()
         let vc = navigationController?.popViewController(animated: true)
         if vc == nil {
@@ -747,15 +758,37 @@ class PhotoPreviewController: UIViewController {
     }
     
     @objc private func onKeepButtonEvent() {
+        handleRemovingCurrentIndex(reason: "keep")
+    }
+    
+    private func handleRemovingCurrentIndex(reason: String) {
         let currentModel = arrDataSources[currentIndex]
         
         arrDataSources.remove(at: currentIndex)
         collectionView.deleteItems(at: [IndexPath(item: currentIndex, section: 0)])
         
+        removingItemCallback?(reason, currentModel)
+        
+        if arrDataSources.isEmpty {
+            if let removingAllCallback = removingAllCallback {
+                removingAllCallback()
+            } else {
+                handleBackEvent()
+            }
+            return
+        }
+        
         let nav = navigationController as? ZLImageNavControllerProtocol
         nav?.arrSelectedModels.removeAll { $0 == currentModel }
         
-        selPhotoPreview?.removeModel(model: currentModel)
+        let newIndex = collectionView.indexPathsForVisibleItems.first?.item ?? 0
+        updateCurrentIndex(newIndex)
+        
+        let newModel = arrDataSources[newIndex]
+        selPhotoPreview?.removeModel(
+            model: currentModel,
+            newModel: newModel
+        )
     }
     
     @objc private func selectBtnClick() {
@@ -773,7 +806,7 @@ class PhotoPreviewController: UIViewController {
         if currentModel.isSelected {
             currentModel.isSelected = false
             nav.arrSelectedModels.removeAll { $0 == currentModel }
-            selPhotoPreview?.removeSelModel(model: currentModel)
+            selPhotoPreview?.deselectModel(model: currentModel)
         } else {
             if !canAddModel(currentModel, currentSelectCount: nav.arrSelectedModels.count, sender: self) {
                 return
@@ -851,7 +884,7 @@ class PhotoPreviewController: UIViewController {
             currentModel.editImage = nil
             currentModel.editImageModel = nil
             nav?.arrSelectedModels.removeAll { $0 == currentModel }
-            selPhotoPreview?.removeSelModel(model: currentModel)
+            selPhotoPreview?.deselectModel(model: currentModel)
             resetSubViewStatus()
             let index = config.sortAscending ? arrDataSources.lastIndex { $0 == currentModel } : arrDataSources.firstIndex { $0 == currentModel }
             if let index = index {
@@ -890,7 +923,7 @@ class PhotoPreviewController: UIViewController {
         }
     }
     
-    private func scrollToSelPreviewCell(_ model: ZLPhotoModel) {
+    private func onSelPhotoPreviewScrollPositionBlock(_ model: ZLPhotoModel) {
         guard let index = arrDataSources.lastIndex(of: model) else {
             return
         }
@@ -990,7 +1023,11 @@ class PhotoPreviewController: UIViewController {
 extension PhotoPreviewController {
     func addDebugGestureForTitleIndexLabel() {
         let tap = UITapGestureRecognizer(target: self, action: #selector(onTitleIndexLaelEvent))
+#if DEBUG
+        tap.numberOfTapsRequired = 2
+#else
         tap.numberOfTapsRequired = 9
+#endif
         titleIndexLabel.addGestureRecognizer(tap)
         titleIndexLabel.isUserInteractionEnabled = true
     }
@@ -1063,6 +1100,15 @@ extension PhotoPreviewController {
         return formatter.string(from: date)
     }
 
+    func toString(_ dict: [AnyHashable: Any]) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: dict) else {
+            return ""
+        }
+        
+        let string = String(data: data, encoding: .utf8)
+        return string ?? ""
+    }
+    
     func updateCurrentAssetDebugInfoLabel() {
         guard let debugInfoLabel = debugInfoLabel else { return }
         
@@ -1099,7 +1145,8 @@ extension PhotoPreviewController {
                     if let data = data,
                        let cImage = CIImage(data: data) {
                         totalProperties = cImage.properties
-                        
+                        let string = self.toString(totalProperties)
+                        print(string)
                         let hasLensModel = (totalProperties["{Exif}"] as? [String: Any])?["LensModel"] != nil
                         desc += "isCam: \(hasLensModel)\n"
                         desc += "other:\n"
@@ -1326,6 +1373,7 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
         return view
     }()
     
+    /// data source array
     private var arrSelectedModels: [ZLPhotoModel]
     
     private var currentShowModel: ZLPhotoModel
@@ -1401,16 +1449,22 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
         */
     }
     
-    func removeSelModel(model: ZLPhotoModel) {
+    func deselectModel(model: ZLPhotoModel) {
         refreshCell(for: model)
     }
     
-    func removeModel(model: ZLPhotoModel) {
+    func removeModel(model: ZLPhotoModel, newModel: ZLPhotoModel) {
         guard let index = arrSelectedModels.firstIndex(where: { $0 == model }) else {
             return
         }
+        
+        currentShowModel = newModel
         arrSelectedModels.remove(at: index)
-        collectionView.deleteItems(at: [IndexPath(row: index, section: 0)])
+        collectionView.performBatchUpdates {
+            self.collectionView.deleteItems(at: [IndexPath(item: index, section: 0)])
+        } completion: { _ in
+            self.collectionView.reloadItems(at: self.collectionView.indexPathsForVisibleItems)
+        }
     }
     
     func refreshCell(for model: ZLPhotoModel) {
@@ -1507,17 +1561,20 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: ZLPhotoPreviewSelectedViewCell.zl.identifier, for: indexPath) as! ZLPhotoPreviewSelectedViewCell
         
-        let m = arrSelectedModels[indexPath.row]
-        cell.model = m
+        let model = arrSelectedModels[indexPath.row]
+        cell.model = model
         
-        let isSelected = m.isSelected
+        let isSelected = model.isSelected
+        let isFocused = model == currentShowModel
+        let borderColor = UIColor(red: 95 / 255.0, green: 112 / 255.0, blue: 254 / 255.0, alpha: 1.0)
         
-        cell.imageView.layer.borderWidth = 0
-        cell.hudView.isHidden = !isSelected
+        cell.imageView.layer.borderColor = borderColor.cgColor
+        cell.imageView.layer.borderWidth = isFocused ? 2 : 0
+        cell.hudView.isHidden = true
         
         if isSelected {
-            cell.checkmarkImageView.isHidden = false
             let image = UIImage(named: "ic_similar_checkmark")
+            cell.checkmarkImageView.isHidden = false
             cell.checkmarkImageView.image = image ?? .zl.getImage("zl_btn_selected")
         } else {
             cell.checkmarkImageView.isHidden = true
@@ -1530,9 +1587,8 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
         guard !isDraging else {
             return
         }
-        let m = arrSelectedModels[indexPath.row]
-        currentShowModel = m
-        selectBlock?(m)
+        let model = arrSelectedModels[indexPath.row]
+        selectBlock?(model)
         collectionView.reloadItems(at: [indexPath])
         
         /*
@@ -1553,6 +1609,11 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
         let index = properIndexForRestPosition(offset: scrollView.contentOffset)
         let model = arrSelectedModels[index]
         scrollPositionBlock(model)
+        
+        if currentShowModel != model {
+            currentShowModel = model
+            self.collectionView.reloadItems(at: self.collectionView.indexPathsForVisibleItems)
+        }
     }
     
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
@@ -1936,4 +1997,18 @@ class PhotoPreviewPopInteractiveTransition: UIPercentDrivenInteractiveTransition
             transitionContext.completeTransition(!transitionContext.transitionWasCancelled)
         }
     }
+}
+
+/// a base class to update intrinsicContentSize for a button with spacing between image and title
+///
+/// see: iphone - UIButton Text Margin / Padding - Stack Overflow
+/// ref: https://stackoverflow.com/questions/5363789/uibutton-text-margin-padding
+class SpacingButton: UIButton {
+  override var intrinsicContentSize: CGSize {
+    let baseSize = super.intrinsicContentSize
+    return CGSize(
+      width: baseSize.width + titleEdgeInsets.left + titleEdgeInsets.right,
+      height: baseSize.height + titleEdgeInsets.top + titleEdgeInsets.bottom
+    )
+  }
 }

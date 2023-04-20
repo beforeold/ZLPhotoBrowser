@@ -383,26 +383,34 @@ class ViewController: UIViewController {
         var assets: [ZLPhotoModel] = []
         
         let limit = 20
-        var count = 0
-        result.enumerateObjects(options: .reverse) { asset, index, stop in
-            count += 1
-            if count > limit {
+        var loopCount = 0
+        result.enumerateObjects(options: []) { asset, index, stop in
+            loopCount += 1
+            if loopCount > limit {
                 stop.pointee = true
                 return
             }
+            
             let photo = ZLPhotoModel(asset: asset)
             photo.isSelected = index % 2 == 0
             assets.append(photo)
         }
         
+        // let index = (0..<limit).randomElement()!
+        let index = 0
         let vc = PhotoPreview.createPhotoPreviewVC(
             photos: assets,
-            index: (0..<limit).randomElement()!,
+            index: index,
             embedsInNavigationController: true,
-            removingReason: "keep") { reason, model in
+            removingReason: "keep") { selectingModel in
+                print("selectingModel", selectingModel)
+            } removingItemCallback: { reason, model in
                 print("removingCallback", reason, model)
+            } removingAllCallback: { [weak self] in
+                print("removingAllCallback")
+                self?.dismiss(animated: true)
             }
-        
+
         show(vc, sender: nil)
     }
 }
