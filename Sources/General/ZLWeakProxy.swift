@@ -75,6 +75,8 @@ public struct PhotoPreview {
         removingItemCallback: ((_ reason: String, _ model: ZLPhotoModel) -> Void)? = nil,
         removingAllCallback: (() -> Void)? = nil
     ) -> UIViewController {
+        PhotoInfoViewModel.shared.prepare()
+        
         let vc = PhotoPreviewController(
             photos: photos,
             index: index
@@ -146,6 +148,7 @@ class PhotoPreviewController: UIViewController {
     var removingReason: String?
     var removingItemCallback: ((_ reason: String, _ model: ZLPhotoModel) -> Void)?
     var removingAllCallback: (() -> Void)?
+    private var infoVC: UIViewController!
     
     var currentIndex: Int {
         didSet {
@@ -245,10 +248,22 @@ class PhotoPreviewController: UIViewController {
         button.contentEdgeInsets = .init(top: 4, left: 8, bottom: 4, right: 12)
         button.backgroundColor = UIColor(white: 1.0, alpha: 0.2)
         button.layer.cornerRadius = 15
-        button.titleLabel?.font = UIFont(name: "SFPro", size: 13)
+        button.titleLabel?.font = sfProFont(13)
         button.addTarget(self, action: #selector(onKeepButtonEvent), for: .touchUpInside)
         button.setTitle(title, for: .normal)
         button.setImage(image, for: .normal)
+        
+        return button
+    }()
+    
+    private lazy var infoButton: UIButton = {
+        let image = UIImage(named: "ic_about_plain")
+        let selectedImage = UIImage(named: "ic_about_colored")
+        
+        let button = SpacingButton(type: .custom)
+        button.addTarget(self, action: #selector(onInfoButtonEvent(_:)), for: .touchUpInside)
+        button.setImage(image, for: .normal)
+        button.setImage(selectedImage, for: .selected)
         
         return button
     }()
@@ -348,6 +363,7 @@ class PhotoPreviewController: UIViewController {
         
         addPopInteractiveTransition()
         resetSubViewStatus()
+        updateCurrentIndex(currentIndex)
       
         setupGestureDepend(on: collectionView)
     }
@@ -573,17 +589,39 @@ class PhotoPreviewController: UIViewController {
         bottomView.addSubview(doneBtn)
         
         // - overlay
-        if let reason = removingReason, reason == "keep" {
-            view.addSubview(keepButton)
-            keepButton.translatesAutoresizingMaskIntoConstraints = false
-            NSLayoutConstraint.activate([
-                keepButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
-                keepButton.bottomAnchor.constraint(equalTo: bottomView.topAnchor, constant: -20),
-                keepButton.heightAnchor.constraint(equalToConstant: 2 * 15),
-            ])
-        }
+        view.addSubview(keepButton)
+        keepButton.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            keepButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
+            keepButton.bottomAnchor.constraint(equalTo: bottomView.topAnchor, constant: -20),
+            keepButton.heightAnchor.constraint(equalToConstant: 2 * 15),
+        ])
+        keepButton.isHidden = (removingReason != "keep")
+        
+        view.addSubview(infoButton)
+        infoButton.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            infoButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
+            infoButton.centerYAnchor.constraint(equalTo: keepButton.centerYAnchor),
+        ])
+        
+        setupInfoView()
         
         view.bringSubviewToFront(navView)
+    }
+    
+    private func setupInfoView() {
+        let rootView = PhotoInfoView(viewModel: .shared)
+        infoVC = UIHostingController(rootView: rootView)
+        view.addSubview(infoVC.view)
+        infoVC.view.backgroundColor = .clear
+        infoVC.view.isUserInteractionEnabled = false
+        infoVC.view.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            infoVC.view.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            infoVC.view.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            infoVC.view.bottomAnchor.constraint(equalTo: keepButton.topAnchor, constant: -75),
+        ])
     }
     
     private func createBtn(_ title: String, _ action: Selector, _ isDone: Bool = false) -> UIButton {
@@ -761,6 +799,15 @@ class PhotoPreviewController: UIViewController {
         handleRemovingCurrentIndex(reason: "keep")
     }
     
+    @objc private func onInfoButtonEvent(_ button: UIButton) {
+        var isSelected = button.isSelected
+        isSelected.toggle()
+        
+        button.isSelected = isSelected
+        
+        PhotoInfoViewModel.shared.update(isDisplaying: isSelected)
+    }
+    
     private func handleRemovingCurrentIndex(reason: String) {
         let currentModel = arrDataSources[currentIndex]
         
@@ -824,6 +871,9 @@ class PhotoPreviewController: UIViewController {
         
         resetSubViewStatus()
         updateCurrentAssetDebugInfoLabel()
+        
+        let asset = arrDataSources[index].asset
+        PhotoInfoViewModel.shared.apply(asset: asset)
     }
     
     @objc private func editBtnClick() {
@@ -1090,15 +1140,6 @@ extension PhotoPreviewController {
     var debugInfoLabel: UILabel? {
         return view.viewWithTag(PhotoPreviewController.debugInfoLabelTag) as? UILabel
     }
-    
-    func formatDate(_ date: Date?) -> String? {
-        guard let date = date else { return nil }
-        let formatter = DateFormatter()
-        formatter.timeZone = .current
-        formatter.dateFormat = "YYYY-MM-dd HH:mm:ss"
-
-        return formatter.string(from: date)
-    }
 
     func toString(_ dict: [AnyHashable: Any]) -> String {
         guard let data = try? JSONSerialization.data(withJSONObject: dict) else {
@@ -1135,7 +1176,7 @@ extension PhotoPreviewController {
         if #available(iOS 13, *) {
             manager.requestImageDataAndOrientation(for: asset, options: requestOptions) { (data, fileName, orientation, info) in
                 DispatchQueue.global().async {
-                    let size = PhotoPreviewController.fileSize(asset: asset)
+                    let (size, _) = PhotoPreviewController.fileSize(asset: asset)
                     let formatter:ByteCountFormatter = ByteCountFormatter()
                     formatter.countStyle = .decimal
                     formatter.allowedUnits = [.useMB, .useKB]
@@ -1165,14 +1206,20 @@ extension PhotoPreviewController {
         }
     }
     
-    static func fileSize(asset: PHAsset) -> Int64 {
-      let resources = PHAssetResource.assetResources(for: asset)
-      let total = resources.reduce(0) { (partialResult, resource) -> Int64 in
-        let fileSize = resource.value(forKey: "fileSize") as? Int64
-        return partialResult + (fileSize ?? 0)
-      }
-      
-      return total
+    static func fileSize(asset: PHAsset) -> (Int64, String?) {
+        let resources = PHAssetResource.assetResources(for: asset)
+        
+        var fileName: String?
+        let total = resources.reduce(0) { (partialResult, resource) -> Int64 in
+            let fileSize = resource.value(forKey: "fileSize") as? Int64
+            if fileName == nil {
+                // set once only
+                fileName = resource.originalFilename
+            }
+            return partialResult + (fileSize ?? 0)
+        }
+        
+        return (total, fileName)
     }
 }
 
@@ -2012,3 +2059,263 @@ class SpacingButton: UIButton {
     )
   }
 }
+
+
+extension String {
+    var localized: String {
+        return NSLocalizedString(self, comment: "")
+    }
+}
+
+import SwiftUI
+
+struct PhotoInfo {
+    struct Item {
+        let key: String
+        let value: String
+    }
+    
+    var name: String
+    var itemList: [Item]
+    
+    static let placeholder: PhotoInfo = .init(
+        name: "--",
+        itemList: [
+            .init(key: "dimension".localized, value: "--"),
+            .init(key: "size".localized, value: "--"),
+            .init(key: "date".localized, value: "--"),
+            .init(key: "album".localized, value: "--"),
+            .init(key: "phone".localized, value: "--"),
+        ]
+    )
+}
+
+struct AlbumInfo {
+    let id: String
+    let title: String?
+    let assetIdSet: Set<String>
+}
+
+class PhotoInfoViewModel: ObservableObject {
+    static let shared: PhotoInfoViewModel = .init()
+    
+    @Published var info: PhotoInfo = .placeholder
+    
+    @Published var isDisplaying = false
+    
+    @Published var albumList: [AlbumInfo]? {
+        didSet {
+            updateAlbumTitle()
+        }
+    }
+    
+    private var asset: PHAsset?
+    
+    private init() {
+        
+    }
+    
+    func update(isDisplaying: Bool) {
+        self.isDisplaying = isDisplaying
+        
+        if isDisplaying, let asset = asset {
+            apply(asset: asset)
+        }
+    }
+    
+    func updateAlbumTitle() {
+        
+    }
+    
+    func prepare() {
+        update(isDisplaying: false)
+        
+        if albumList != nil {
+            return
+        }
+        
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        guard status == .authorized || status == .limited else {
+            return
+        }
+        
+        DispatchQueue.global().async {
+            let collectionResult = PHCollection.fetchTopLevelUserCollections(with: nil)
+            var albumList: [AlbumInfo] = []
+            collectionResult.enumerateObjects { collection, _, _ in
+                guard let assetCollection = collection as? PHAssetCollection else { return }
+                
+                var idSet: Set<String> = []
+                let assetResult = PHAsset.fetchAssets(in: assetCollection, options: nil)
+                assetResult.enumerateObjects { asset, _, _ in
+                    idSet.insert(asset.localIdentifier)
+                }
+                
+                let albumInfo = AlbumInfo(
+                    id: assetCollection.localIdentifier,
+                    title: assetCollection.localizedTitle,
+                    assetIdSet: idSet)
+                albumList.append(albumInfo)
+            }
+            
+            DispatchQueue.main.async {
+                self.albumList = albumList
+            }
+        }
+    }
+    
+    func apply(asset: PHAsset) {
+        self.asset = asset
+        
+        guard isDisplaying else {
+            return
+        }
+        
+        loadInfo(asset: asset)
+    }
+    
+    private func loadInfo(asset: PHAsset) {
+        let manager = PHImageManager.default()
+        let requestOptions = PHImageRequestOptions()
+        requestOptions.isSynchronous = false
+        requestOptions.deliveryMode = .fastFormat
+        requestOptions.isNetworkAccessAllowed = true
+        
+        manager.requestImageDataAndOrientation(for: asset, options: requestOptions) { (data, fileType, orientation, info) in
+            DispatchQueue.global().async {
+                var itemList: [PhotoInfo.Item] = []
+                itemList.append(.init(key: "dimension".localized, value: "\(asset.pixelWidth) x \(asset.pixelHeight)"))
+                
+                let (size, fileName) = PhotoPreviewController.fileSize(asset: asset)
+                
+                let formatter: ByteCountFormatter = ByteCountFormatter()
+                formatter.countStyle = .decimal
+                formatter.allowedUnits = [.useMB, .useKB]
+                let sizeString = formatter.string(fromByteCount: size)
+                itemList.append(.init(key: "size".localized, value: sizeString))
+
+                let date = (asset.modificationDate ?? asset.creationDate) ?? Date()
+                let dateString = formatDate(date) ?? "unknown".localized
+                itemList.append(.init(key: "date".localized, value: dateString))
+                
+                let phoneString: String
+                if let data = data,
+                   let properties = CIImage(data: data)?.properties,
+                   let tiff = properties["{TIFF}"] as? [String: Any],
+                   let model = tiff["Model"] as? String {
+                    phoneString = model
+                }  else {
+                    phoneString = "unknown".localized
+                }
+                
+                DispatchQueue.main.async {
+                    guard asset.localIdentifier == self.asset?.localIdentifier else {
+                        return
+                    }
+                    
+                    let firstAlbum = self.albumList?.first {
+                        $0.assetIdSet.contains(asset.localIdentifier)
+                    }
+                    
+                    let albumString = firstAlbum?.title ?? "unknown".localized
+                    itemList.append(.init(key: "album".localized, value: albumString))
+                    
+                    itemList.append(.init(key: "phone".localized, value: phoneString))
+                    
+                    let nameComponents = fileName.map { $0.components(separatedBy: ".") } ?? []
+                    let nameString = nameComponents.first ?? "unknown".localized
+                    
+                    let info = PhotoInfo(name: nameString, itemList: itemList)
+                    self.info = info
+                }
+            }
+        }
+    }
+}
+
+struct PhotoInfoView: View {
+    @StateObject var viewModel: PhotoInfoViewModel
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Text(viewModel.info.name)
+                .foregroundColor(.white)
+            HStack {
+                itemList
+                Spacer()
+            }
+        }
+        .font(Font(sfProFont(13)))
+        .padding(24)
+        .frame(
+          maxWidth: .infinity
+        )
+        .background(backgroundColor)
+        .cornerRadius(16)
+        .opacity(viewModel.isDisplaying ? 1.0 : 0.0)
+    }
+    
+    var itemList: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            ForEach(viewModel.info.itemList, id: \.key) { item in
+                HStack(spacing: 5) {
+                    Text("\(item.key):")
+                        .foregroundColor(grayColor)
+                    Text(item.value)
+                        .foregroundColor(.white)
+                }
+            }
+        }
+    }
+    
+    var backgroundColor: Color {
+        let uicolor = UIColor(white: 0, alpha: 0.7)
+        return Color(uicolor)
+    }
+    
+    var grayColor: Color {
+        let uicolor = UIColor(red: 146 / 255.0, green: 146 / 255.0, blue: 146 / 255.0, alpha: 1.0)
+        return Color(uicolor)
+    }
+}
+
+fileprivate func sfProFont(_ size: CGFloat) -> UIFont {
+    let uifont = UIFont(name: "SFPro", size: size)
+    
+    return uifont ?? UIFont.systemFont(ofSize: size)
+}
+
+
+fileprivate func formatDate(_ date: Date?) -> String? {
+    guard let date = date else { return nil }
+    let formatter = DateFormatter()
+    formatter.timeZone = .current
+    formatter.dateStyle = .medium
+    formatter.timeStyle = .short
+
+    return formatter.string(from: date)
+}
+
+
+#if DEBUG
+struct PhotoInfoView_Previews: PreviewProvider {
+    static var previews: some View {
+        PhotoInfoView(viewModel: {
+            let ins = PhotoInfoViewModel.shared
+            ins.info = .init(
+                name: "IMG_20230405_135917 ",
+                itemList: [
+                    .init(key: "Dimension", value: "3648 x 2736"),
+                    .init(key: "Size", value: "12.30MB"),
+                    .init(key: "Date", value: "Apr 4, 2023 10:02"),
+                    .init(key: "Album", value: "Twitter"),
+                    .init(key: "Phone", value: "iPhone 14 pro"),
+                ]
+            )
+            return ins
+        }()
+        )
+        .frame(width: 380)
+    }
+}
+#endif
