@@ -2194,7 +2194,7 @@ class PhotoInfoViewModel: ObservableObject {
                 let sizeString = formatter.string(fromByteCount: size)
                 itemList.append(.init(key: "size".localized, value: sizeString))
 
-                let date = (asset.modificationDate ?? asset.creationDate) ?? Date()
+                let date = asset.creationDate ?? Date()
                 let dateString = formatDate(date) ?? "unknown".localized
                 itemList.append(.init(key: "date".localized, value: dateString))
                 
