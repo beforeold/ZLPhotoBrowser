@@ -69,8 +69,8 @@ public struct PhotoPreview {
         index: Int = 0,
         isMenuContextPreview: Bool = false,
         embedsInNavigationController: Bool = false,
-        removingReason: String? = nil,
         context: [String: Any]? = nil,
+        removingReason: String? = nil,
         selectionEventCallback: @escaping (ZLPhotoModel) -> Void,
         fromFrameProvider: ZLAssetFromFrameProvider = nil,
         removingItemCallback: ((_ reason: String, _ model: ZLPhotoModel) -> Void)? = nil,
@@ -395,8 +395,7 @@ class PhotoPreviewController: UIViewController {
         }
         
         if !isMenuContextPreview {
-            // track exposure
-            
+            trackPageExposure()
         }
     }
     
@@ -455,6 +454,33 @@ class PhotoPreviewController: UIViewController {
                 )
             }
         }
+    }
+    
+    // MARK: - private
+    private func trackPageExposure() {
+        // track exposure
+        var properties: [String: Any] = [:]
+        properties["from"] = context?["from"]
+        
+        PhotoPreview.trackEvent(
+            event: "Clean",
+            action: "photo_preview_detail",
+            properties: properties
+        )
+    }
+    
+    private func trackKeepAction() {
+        PhotoPreview.trackEvent(
+            event: "Clean",
+            action: "click_photo_preview_detail_keep"
+        )
+    }
+    
+    private func trackInfoAction() {
+        PhotoPreview.trackEvent(
+            event: "Clean",
+            action: "click_photo_preview_detail_keep"
+        )
     }
     
     private func reloadCurrentCell() {
@@ -807,10 +833,18 @@ class PhotoPreviewController: UIViewController {
     
     @objc private func onKeepButtonEvent() {
         handleRemovingCurrentIndex(reason: "keep")
+        
+        trackKeepAction()
     }
     
     @objc private func onInfoButtonEvent(_ button: UIButton) {
         var isSelected = button.isSelected
+        
+        if !isSelected {
+            // track display photo info
+            trackInfoAction()
+        }
+        
         isSelected.toggle()
         
         button.isSelected = isSelected
@@ -2136,6 +2170,7 @@ struct AlbumInfo {
 }
 
 class PhotoInfoViewModel: ObservableObject {
+    /// a shared instance to save its albumList
     static let shared: PhotoInfoViewModel = .init()
     
     @Published var info: PhotoInfo = .placeholder
