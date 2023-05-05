@@ -70,6 +70,7 @@ public struct PhotoPreview {
         isMenuContextPreview: Bool = false,
         embedsInNavigationController: Bool = false,
         removingReason: String? = nil,
+        context: [String: Any]? = nil,
         selectionEventCallback: @escaping (ZLPhotoModel) -> Void,
         fromFrameProvider: ZLAssetFromFrameProvider = nil,
         removingItemCallback: ((_ reason: String, _ model: ZLPhotoModel) -> Void)? = nil,
@@ -87,6 +88,7 @@ public struct PhotoPreview {
         vc.removingReason = removingReason
         vc.removingItemCallback = removingItemCallback
         vc.removingAllCallback = removingAllCallback
+        vc.context = context
         
         if embedsInNavigationController {
             return ZLImageNavController(rootViewController: vc)
@@ -144,6 +146,9 @@ class PhotoPreviewController: UIViewController {
     
     var selectionEventCallback: (ZLPhotoModel) -> Void = { _ in }
     var fromFrameProvider: ZLAssetFromFrameProvider = nil
+    
+    /// the context of the caller
+    var context: [String: Any]?
     
     var removingReason: String?
     var removingItemCallback: ((_ reason: String, _ model: ZLPhotoModel) -> Void)?
@@ -301,7 +306,7 @@ class PhotoPreviewController: UIViewController {
     
     private var selPhotoPreview: PhotoPreviewSelectedView?
     
-    private var isFirstAppear = true
+    private var hasAppear = true
     
     private var hideNavView = false
     
@@ -384,10 +389,15 @@ class PhotoPreviewController: UIViewController {
         super.viewDidAppear(animated)
         navigationController?.delegate = self
         
-        guard isFirstAppear else { return }
-        isFirstAppear = false
+        if !hasAppear {
+            reloadCurrentCell()
+            hasAppear = true
+        }
         
-        reloadCurrentCell()
+        if !isMenuContextPreview {
+            // track exposure
+            
+        }
     }
     
     override func viewWillDisappear(_ animated: Bool) {
@@ -1385,9 +1395,13 @@ extension Int {
 
 class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDragDelegate, UICollectionViewDropDelegate {
     static let itemLength: CGFloat = 40
+    
     static var insetLength: CGFloat = UIScreen.main.bounds.width * 0.5 - itemLength * 0.5
+    
     static let minimumSpacing: CGFloat = 12
+    
     typealias ZLPhotoPreviewSelectedViewCell = PhotoPreviewSelectedViewCell
+    
     private lazy var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.itemSize = CGSize(width: Self.itemLength, height: Self.itemLength)
@@ -1453,6 +1467,29 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
     
     private func setupUI() {
         addSubview(collectionView)
+        addFocusView()
+    }
+    
+    private func addFocusView() {
+        let borderColor = UIColor(red: 95 / 255.0, green: 112 / 255.0, blue: 254 / 255.0, alpha: 1.0)
+        
+        let view = UIView()
+        view.layer.cornerRadius = 1
+        view.layer.borderColor = borderColor.cgColor
+        view.layer.borderWidth = 2
+        view.layer.cornerRadius = 8
+        view.layer.masksToBounds = true
+        
+        addSubview(view)
+        
+        // center the focus view
+        view.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            view.widthAnchor.constraint(equalToConstant: Self.itemLength),
+            view.heightAnchor.constraint(equalToConstant: Self.itemLength),
+            view.centerXAnchor.constraint(equalTo: collectionView.centerXAnchor),
+            view.centerYAnchor.constraint(equalTo: collectionView.centerYAnchor),
+        ])
     }
     
     @available(*, unavailable)
@@ -1616,8 +1653,10 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
         let borderColor = UIColor(red: 95 / 255.0, green: 112 / 255.0, blue: 254 / 255.0, alpha: 1.0)
         
         cell.imageView.layer.borderColor = borderColor.cgColor
+        /*
         cell.imageView.layer.borderWidth = isFocused ? 2 : 0
-        cell.hudView.isHidden = true
+        */
+        cell.hudView.isHidden = !isSelected
         
         if isSelected {
             let image = UIImage(named: "ic_similar_checkmark")
@@ -2256,7 +2295,7 @@ struct PhotoInfoView: View {
     }
     
     var itemList: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 8) {
             ForEach(viewModel.info.itemList, id: \.key) { item in
                 HStack(spacing: 5) {
                     Text("\(item.key):")
