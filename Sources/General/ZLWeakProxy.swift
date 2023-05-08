@@ -1501,10 +1501,10 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
     
     private func setupUI() {
         addSubview(collectionView)
-        addFocusView()
+        addFocusHudView()
     }
     
-    private func addFocusView() {
+    private func addFocusHudView() {
         let borderColor = UIColor(red: 95 / 255.0, green: 112 / 255.0, blue: 254 / 255.0, alpha: 1.0)
         
         let view = UIView()
@@ -1513,6 +1513,7 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
         view.layer.borderWidth = 2
         view.layer.cornerRadius = 8
         view.layer.masksToBounds = true
+        view.isUserInteractionEnabled = false
         
         addSubview(view)
         
