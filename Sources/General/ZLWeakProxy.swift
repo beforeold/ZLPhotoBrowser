@@ -2346,14 +2346,7 @@ struct PhotoInfoView: View {
     @StateObject var viewModel: PhotoInfoViewModel
     
     var body: some View {
-        VStack(spacing: 20) {
-            Text(viewModel.info.name)
-                .foregroundColor(.white)
-            HStack {
-                itemList
-                Spacer()
-            }
-        }
+        itemListView
         .font(Font(sfProFont(13)))
         .padding(24)
         .frame(
@@ -2364,8 +2357,15 @@ struct PhotoInfoView: View {
         .opacity(viewModel.isDisplaying ? 1.0 : 0.0)
     }
     
+    private var itemListView: some View {
+        HStack {
+            itemList
+            Spacer()
+        }
+    }
+    
     var itemList: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 4) {
             ForEach(viewModel.info.itemList, id: \.key) { item in
                 HStack(spacing: 5) {
                     Text("\(item.key):")
