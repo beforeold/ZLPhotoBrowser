@@ -2187,6 +2187,9 @@ class PhotoInfoViewModel: ObservableObject {
     
     @Published var isDisplaying = false
     
+    var recentAddTitle: String?
+    var favorateTitle: String?
+    
     @Published var albumList: [AlbumInfo]? {
         didSet {
             updateAlbumTitle()
@@ -2226,6 +2229,7 @@ class PhotoInfoViewModel: ObservableObject {
         DispatchQueue.global().async {
             let collectionResult = PHCollection.fetchTopLevelUserCollections(with: nil)
             var albumList: [AlbumInfo] = []
+            
             collectionResult.enumerateObjects { collection, _, _ in
                 guard let assetCollection = collection as? PHAssetCollection else { return }
                 
@@ -2241,8 +2245,24 @@ class PhotoInfoViewModel: ObservableObject {
                     assetIdSet: idSet)
                 albumList.append(albumInfo)
             }
+            let favoriteTitle = PHAssetCollection.fetchAssetCollections(
+                with: .smartAlbum,
+                subtype: .smartAlbumFavorites,
+                options: nil
+            )
+                .firstObject?
+                .localizedTitle
+            let recentAddTitle = PHAssetCollection.fetchAssetCollections(
+                with: .smartAlbum,
+                subtype: .smartAlbumRecentlyAdded,
+                options: nil
+            )
+                .firstObject?
+                .localizedTitle
             
             DispatchQueue.main.async {
+                self.favorateTitle = favoriteTitle
+                self.recentAddTitle = recentAddTitle
                 self.albumList = albumList
             }
         }
@@ -2256,6 +2276,18 @@ class PhotoInfoViewModel: ObservableObject {
         }
         
         loadInfo(asset: asset)
+    }
+    
+    private func otherPossibleAlbumTitle(asset: PHAsset) -> String {
+        if let favorateTitle = favorateTitle, asset.isFavorite {
+            return favorateTitle
+        }
+        
+        if let recentAddTitle = recentAddTitle {
+            return recentAddTitle
+        }
+        
+        return "unknown".localized
     }
     
     private func loadInfo(asset: PHAsset) {
@@ -2301,7 +2333,7 @@ class PhotoInfoViewModel: ObservableObject {
                         $0.assetIdSet.contains(asset.localIdentifier)
                     }
                     
-                    let albumString = firstAlbum?.title ?? "unknown".localized
+                    let albumString = firstAlbum?.title ?? self.otherPossibleAlbumTitle(asset: asset)
                     itemList.append(.init(key: "album".localized, value: albumString))
                     
                     itemList.append(.init(key: "phone".localized, value: phoneString))
