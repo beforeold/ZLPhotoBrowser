@@ -438,7 +438,10 @@ class PhotoPreviewController: UIViewController {
         }
         
         backBtn.frame = CGRect(x: insets.left, y: insets.top, width: 60, height: 44)
+        /*
         selectBtn.frame = CGRect(x: view.frame.width - 40 - insets.right, y: insets.top + (44 - 25) / 2, width: 25, height: 25)
+        */
+        infoButton.frame = CGRect(x: view.frame.width - 40 - insets.right, y: insets.top + (44 - 25) / 2, width: 25, height: 25)
         indexLabel.frame = selectBtn.bounds
         
         refreshBottomViewFrame()
@@ -558,7 +561,10 @@ class PhotoPreviewController: UIViewController {
         }
         
         navView.addSubview(backBtn)
+        /*
         navView.addSubview(selectBtn)
+        */
+        navView.addSubview(infoButton)
         
         navView.addSubview(titleIndexLabel)
         titleIndexLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -634,11 +640,14 @@ class PhotoPreviewController: UIViewController {
         ])
         keepButton.isHidden = (removingReason != "keep")
         
-        view.addSubview(infoButton)
-        infoButton.translatesAutoresizingMaskIntoConstraints = false
+        let button = selectBtn
+        view.addSubview(button)
+        button.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            infoButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
-            infoButton.centerYAnchor.constraint(equalTo: keepButton.centerYAnchor),
+            button.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
+            button.centerYAnchor.constraint(equalTo: keepButton.centerYAnchor),
+            button.widthAnchor.constraint(equalToConstant: 25),
+            button.heightAnchor.constraint(equalToConstant: 25),
         ])
         
         setupInfoView()
@@ -656,7 +665,7 @@ class PhotoPreviewController: UIViewController {
         NSLayoutConstraint.activate([
             infoVC.view.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             infoVC.view.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            infoVC.view.bottomAnchor.constraint(equalTo: keepButton.topAnchor, constant: -75),
+            infoVC.view.topAnchor.constraint(equalTo: navView.bottomAnchor, constant: 22),
         ])
     }
     
