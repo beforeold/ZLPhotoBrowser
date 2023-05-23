@@ -208,9 +208,10 @@ class PhotoPreviewController: UIViewController {
     }()
     
     private lazy var selectBtn: ZLEnlargeButton = {
+        let selectedImage = UIImage(named: "ic_checkbox_selected") ?? .zl.getImage("zl_btn_selected")
         let btn = ZLEnlargeButton(type: .custom)
         btn.setImage(UIImage(named: "ic_checkbox_unselected") ?? .zl.getImage("zl_btn_circle"), for: .normal)
-        btn.setImage(UIImage(named: "ic_checkbox_selected") ?? .zl.getImage("zl_btn_selected"), for: .selected)
+        btn.setImage(selectedImage, for: .selected)
         btn.enlargeInset = 10
         btn.addTarget(self, action: #selector(selectBtnClick), for: .touchUpInside)
         return btn
@@ -1436,8 +1437,8 @@ extension Int {
 
 // MARK: 下方显示的已选择照片列表
 
-class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDragDelegate, UICollectionViewDropDelegate {
-    static let itemLength: CGFloat = 40
+class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, UICollectionViewDragDelegate, UICollectionViewDropDelegate {
+    static let itemLength: CGFloat = 48
     
     static var insetLength: CGFloat = UIScreen.main.bounds.width * 0.5 - itemLength * 0.5
     
@@ -1517,13 +1518,9 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
         let borderColor = UIColor(red: 95 / 255.0, green: 112 / 255.0, blue: 254 / 255.0, alpha: 1.0)
         
         let view = UIView()
-        view.layer.cornerRadius = 1
+        view.isUserInteractionEnabled = false
         view.layer.borderColor = borderColor.cgColor
         view.layer.borderWidth = 2
-        view.layer.cornerRadius = 8
-        view.layer.masksToBounds = true
-        view.isUserInteractionEnabled = false
-        
         addSubview(view)
         
         // center the focus view
@@ -1544,7 +1541,10 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
     override func layoutSubviews() {
         super.layoutSubviews()
         
-        collectionView.frame = CGRect(x: 0, y: 10, width: bounds.width, height: 80)
+        let top: CGFloat = 10
+        let height = PhotoPreviewController.selPhotoPreviewH - 2 * top
+        collectionView.frame = CGRect(x: 0, y: top, width: bounds.width, height: height)
+        
         if let index = arrSelectedModels.firstIndex(where: { $0 == self.currentShowModel }) {
             collectionView.scrollToItem(at: IndexPath(row: index, section: 0), at: .centeredHorizontally, animated: false)
         }
@@ -1693,22 +1693,13 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
         cell.model = model
         
         let isSelected = model.isSelected
-        let isFocused = model == currentShowModel
         let borderColor = UIColor(red: 95 / 255.0, green: 112 / 255.0, blue: 254 / 255.0, alpha: 1.0)
-        
+        let selectedImage = UIImage(named: "ic_checkbox_selected") ?? .zl.getImage("zl_btn_selected")
+
         cell.imageView.layer.borderColor = borderColor.cgColor
-        /*
-        cell.imageView.layer.borderWidth = isFocused ? 2 : 0
-        */
-        cell.hudView.isHidden = !isSelected
-        
-        if isSelected {
-            let image = UIImage(named: "ic_similar_checkmark")
-            cell.checkmarkImageView.isHidden = false
-            cell.checkmarkImageView.image = image ?? .zl.getImage("zl_btn_selected")
-        } else {
-            cell.checkmarkImageView.isHidden = true
-        }
+        cell.hudView.isHidden = true
+        cell.checkmarkImageView.image = selectedImage
+        cell.checkmarkImageView.isHidden = !isSelected
         
         return cell
     }
@@ -1831,9 +1822,11 @@ class PhotoPreviewSelectedViewCell: UICollectionViewCell {
     override init(frame: CGRect) {
         super.init(frame: frame)
         
+        /*
         imageView.layer.cornerRadius = 8
         imageView.layer.masksToBounds = true
-        // imageView.layer.borderColor = UIColor.zl.bottomToolViewBtnNormalBgColorOfPreviewVC.cgColor
+        imageView.layer.borderColor = UIColor.zl.bottomToolViewBtnNormalBgColorOfPreviewVC.cgColor
+        */
         imageView.layer.borderColor = UIColor(red: 0.373, green: 0.439, blue: 0.996, alpha: 1).cgColor
       
         contentView.addSubview(imageView)
@@ -1852,8 +1845,8 @@ class PhotoPreviewSelectedViewCell: UICollectionViewCell {
         contentView.addSubview(checkmarkImageView)
         checkmarkImageView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            checkmarkImageView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            checkmarkImageView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            checkmarkImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -2),
+            checkmarkImageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -2),
         ])
     }
     
