@@ -246,7 +246,7 @@ class PhotoPreviewController: UIViewController {
     }()
     
     private lazy var keepButton: UIButton = {
-        let title = NSLocalizedString("ignore", comment: "")
+        let title = NSLocalizedString("keep", comment: "")
         let image = UIImage(named: "ic_star_sparkle_filled_16")
         
         let button = SpacingButton(type: .custom)
