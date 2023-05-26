@@ -228,7 +228,7 @@ class PhotoPreviewController: UIViewController {
         label.isHidden = true
         return label
     }()
-  
+    
     private lazy var titleIndexLabel: UILabel = {
         let label = UILabel()
         label.font = UIFont(name: "SFPro-Semibold", size: 17)
@@ -236,9 +236,9 @@ class PhotoPreviewController: UIViewController {
         label.textAlignment = .center
         return label
     }()
-  
+    
     var isMenuContextPreview = false
-  
+    
     private lazy var bottomView: UIView = {
         let view = UIView()
         view.backgroundColor = .zl.bottomToolViewBgColorOfPreviewVC
@@ -259,6 +259,18 @@ class PhotoPreviewController: UIViewController {
         button.setTitle(title, for: .normal)
         button.setImage(image, for: .normal)
         
+        return button
+    }()
+    
+    private lazy var saveButton: UIButton = {
+        let button = SpacingButton(type: .custom)
+        button.titleEdgeInsets = . init(top: 0, left: 8, bottom: 0, right: 0)
+        button.contentEdgeInsets = .init(top: 4, left: 8, bottom: 4, right: 12)
+        button.backgroundColor = UIColor(white: 1.0, alpha: 0.2)
+        button.layer.cornerRadius = 15
+        button.titleLabel?.font = sfProFont(13)
+        button.addTarget(self, action: #selector(onSaveButtonEvent), for: .touchUpInside)
+        button.setTitle("save badcase", for: .normal)
         return button
     }()
     
@@ -370,10 +382,10 @@ class PhotoPreviewController: UIViewController {
         addPopInteractiveTransition()
         resetSubViewStatus()
         updateCurrentIndex(currentIndex)
-      
+        
         setupGestureDepend(on: collectionView)
     }
-  
+    
     fileprivate func setupGestureDepend(on scrollView: UIScrollView) {
         if let navPan = navigationController?.interactivePopGestureRecognizer {
             collectionView.panGestureRecognizer.require(toFail: navPan)
@@ -641,6 +653,18 @@ class PhotoPreviewController: UIViewController {
         ])
         keepButton.isHidden = (removingReason != "keep")
         
+      
+        let show =  UserDefaults().bool(forKey: "settings.qa.showsTestSettings")
+        if show {
+          view.addSubview(saveButton)
+          saveButton.translatesAutoresizingMaskIntoConstraints = false
+          NSLayoutConstraint.activate([
+              saveButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
+              saveButton.bottomAnchor.constraint(equalTo: bottomView.topAnchor, constant: -80),
+              saveButton.heightAnchor.constraint(equalToConstant: 2 * 15),
+          ])
+        }
+        
         let button = selectBtn
         view.addSubview(button)
         button.translatesAutoresizingMaskIntoConstraints = false
@@ -847,6 +871,10 @@ class PhotoPreviewController: UIViewController {
         trackKeepAction()
     }
     
+    @objc private func onSaveButtonEvent() {
+        handleSaveBadCase()
+    }
+    
     @objc private func onInfoButtonEvent(_ button: UIButton) {
         var isSelected = button.isSelected
         
@@ -890,6 +918,55 @@ class PhotoPreviewController: UIViewController {
             model: currentModel,
             newModel: newModel
         )
+    }
+    
+    
+    private func handleSaveBadCase() {
+        let albumName = "badcase"
+        createAlbum(albumName: albumName) { album in
+          self.saveAssetToAlbum(album, albumName: albumName)
+        }
+    }
+    
+    func saveAssetToAlbum(_ ablum :PHAssetCollection?, albumName: String) {
+      let currentModel = arrDataSources[currentIndex]
+      PHPhotoLibrary.shared().performChanges({
+          let request = PHAssetCollectionChangeRequest(for: ablum!)
+          request?.addAssets([currentModel.asset] as NSFastEnumeration)
+          
+          }) { (isHandle, error) in
+              if isHandle {
+                print("保存成功")
+              }else{
+                print(error?.localizedDescription ?? "")
+              }
+          }
+    }
+    
+    private func createAlbum(albumName: String, completion: @escaping (PHAssetCollection?) -> Void) {
+        // 检查相册是否已存在，如果不存在则创建相册
+        let fetchOptions = PHFetchOptions()
+        fetchOptions.predicate = NSPredicate(format: "title = %@", albumName)
+        let fetchResult = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .any, options: fetchOptions)
+        if let album = fetchResult.firstObject {
+            // 相册已存在，直接返回
+            completion(album)
+        } else {
+            // 相册不存在，创建相册
+            var albumPlaceholder: PHObjectPlaceholder?
+            PHPhotoLibrary.shared().performChanges({
+                let albumChangeRequest = PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: albumName)
+                albumPlaceholder = albumChangeRequest.placeholderForCreatedAssetCollection
+            }, completionHandler: { (success, error) in
+                guard success, let albumPlaceholder = albumPlaceholder else {
+                    completion(nil)
+                    return
+                }
+                let fetchResult = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [albumPlaceholder.localIdentifier], options: nil)
+                let album = fetchResult.firstObject
+                completion(album)
+            })
+        }
     }
     
     @objc private func selectBtnClick() {
