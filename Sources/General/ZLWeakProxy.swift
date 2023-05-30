@@ -654,7 +654,8 @@ class PhotoPreviewController: UIViewController {
         keepButton.isHidden = (removingReason != "keep")
         
       
-        let show =  UserDefaults().bool(forKey: "settings.qa.showsTestSettings")
+//        let show =  UserDefaults().bool(forKey: "settings.qa.showsTestSettings")
+        let show =  true
         if show {
           view.addSubview(saveButton)
           saveButton.translatesAutoresizingMaskIntoConstraints = false
@@ -922,13 +923,37 @@ class PhotoPreviewController: UIViewController {
     
     
     private func handleSaveBadCase() {
-        let albumName = "badcase"
+        let albumName = getAblumNameFromContext()
         createAlbum(albumName: albumName) { album in
           self.saveAssetToAlbum(album, albumName: albumName)
         }
     }
     
-    func saveAssetToAlbum(_ ablum :PHAssetCollection?, albumName: String) {
+    private func getAblumNameFromContext() -> String {
+        let albumName = "badcase"
+        guard let from = context?["from"] as? String else { return albumName }
+        if from == "photo_clean_same" {
+            return "duplicate_badcase"
+        }
+        if from == "photo_clean_similar" {
+            return "similar_badcase"
+        }
+        if from == "photo_clean_screenshots" {
+            return "screenshot_badcase"
+        }
+        if from == "photo_clean_blur" {
+            return "blur_badcase"
+        }
+        if from == "photo_clean_notes" {
+            return "notes_badcase"
+        }
+        if from == "photo_clean_keeplist" {
+            return "keep_badcase"
+        }
+        return albumName
+    }
+    
+    private func saveAssetToAlbum(_ ablum :PHAssetCollection?, albumName: String) {
       let currentModel = arrDataSources[currentIndex]
       PHPhotoLibrary.shared().performChanges({
           let request = PHAssetCollectionChangeRequest(for: ablum!)
@@ -936,11 +961,35 @@ class PhotoPreviewController: UIViewController {
           
           }) { (isHandle, error) in
               if isHandle {
-                print("保存成功")
+                  self.showToast("保存成功")
               }else{
-                print(error?.localizedDescription ?? "")
+                  self.showToast(error?.localizedDescription ?? "")
               }
           }
+    }
+    
+    private func showToast(_ message: String) {
+        DispatchQueue.main.async {
+            let toastLabel = UILabel(frame: CGRect(x: self.view.frame.size.width/2 - 150, y: self.view.frame.size.height-100, width: 300, height: 35))
+            toastLabel.backgroundColor = UIColor.black.withAlphaComponent(0.6)
+            toastLabel.textColor = UIColor.white
+            toastLabel.textAlignment = .center
+            toastLabel.text = message
+            toastLabel.font = UIFont.systemFont(ofSize: 14)
+            toastLabel.alpha = 0.0
+            toastLabel.layer.cornerRadius = 10;
+            toastLabel.clipsToBounds  =  true
+            self.view.addSubview(toastLabel)
+            UIView.animate(withDuration: 0.5, delay: 0.0, options: .curveEaseOut, animations: {
+                toastLabel.alpha = 1.0
+            }, completion: { _ in
+                UIView.animate(withDuration: 0.5, delay: 2.0, options: .curveEaseOut, animations: {
+                    toastLabel.alpha = 0.0
+                }, completion: { _ in
+                    toastLabel.removeFromSuperview()
+                })
+            })
+        }
     }
     
     private func createAlbum(albumName: String, completion: @escaping (PHAssetCollection?) -> Void) {
