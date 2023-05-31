@@ -620,8 +620,8 @@ class PhotoPreviewController: UIViewController {
                 var properties: [String: Any] = [:]
                 properties["from"] = self?.context?["from"]
                 
-                let selectAction = "click_photo_preview_detail_cancel_select"
-                let cancelAction = "click_photo_preview_detail_select"
+                let selectAction = "click_photo_preview_detail_select"
+                let cancelAction = "click_photo_preview_detail_cancel_select"
                 let action = model.isSelected ? cancelAction : selectAction
                 PhotoPreview.trackEvent(event: "Clean", action: action, properties: properties)
                 
