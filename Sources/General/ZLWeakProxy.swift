@@ -669,10 +669,10 @@ class PhotoPreviewController: UIViewController {
         view.addSubview(button)
         button.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            button.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
+            button.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -18),
             button.centerYAnchor.constraint(equalTo: keepButton.centerYAnchor),
-            button.widthAnchor.constraint(equalToConstant: 25),
-            button.heightAnchor.constraint(equalToConstant: 25),
+            button.widthAnchor.constraint(equalToConstant: 30),
+            button.heightAnchor.constraint(equalToConstant: 30),
         ])
         
         setupInfoView()
