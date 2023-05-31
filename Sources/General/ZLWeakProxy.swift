@@ -654,8 +654,7 @@ class PhotoPreviewController: UIViewController {
         keepButton.isHidden = (removingReason != "keep")
         
       
-//        let show =  UserDefaults().bool(forKey: "settings.qa.showsTestSettings")
-        let show =  true
+        let show =  UserDefaults().bool(forKey: "settings.qa.showsTestSettings")
         if show {
           view.addSubview(saveButton)
           saveButton.translatesAutoresizingMaskIntoConstraints = false
@@ -941,7 +940,7 @@ class PhotoPreviewController: UIViewController {
         if from == "photo_clean_screenshots" {
             return "screenshot_badcase"
         }
-        if from == "photo_clean_blur" {
+        if from == "photo_clean_blurred" {
             return "blur_badcase"
         }
         if from == "photo_clean_notes" {
