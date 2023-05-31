@@ -653,8 +653,8 @@ class PhotoPreviewController: UIViewController {
         ])
         keepButton.isHidden = (removingReason != "keep")
         
-      
-        let show =  UserDefaults().bool(forKey: "settings.qa.showsTestSettings")
+        let settings: UserDefaults? = .init(suiteName: "bubble_settings")
+        let show = (settings?.bool(forKey: "settings.qa.showsTestSettings")) ?? false
         if show {
           view.addSubview(saveButton)
           saveButton.translatesAutoresizingMaskIntoConstraints = false
