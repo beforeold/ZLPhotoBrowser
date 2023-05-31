@@ -122,7 +122,7 @@ extension PhotoPreview {
     static func trackEvent(
         event: String,
         action: String,
-        properties: [String: Any] = [:]
+        properties: [String: Any]
     ) {
         appTracker?.trackEvent(
             event: event,
@@ -486,16 +486,24 @@ class PhotoPreviewController: UIViewController {
     }
     
     private func trackKeepAction() {
+        var properties: [String: Any] = [:]
+        properties["from"] = context?["from"]
+        
         PhotoPreview.trackEvent(
             event: "Clean",
-            action: "click_photo_preview_detail_keep"
+            action: "click_photo_preview_detail_keep",
+            properties: properties
         )
     }
     
     private func trackInfoAction() {
+        var properties: [String: Any] = [:]
+        properties["from"] = context?["from"]
+        
         PhotoPreview.trackEvent(
             event: "Clean",
-            action: "click_photo_preview_detail_keep"
+            action: "click_photo_preview_detail_info",
+            properties: properties
         )
     }
     
@@ -609,15 +617,23 @@ class PhotoPreviewController: UIViewController {
             selPhotoPreview = PhotoPreviewSelectedView(selModels: self.arrDataSources, currentShowModel: arrDataSources[currentIndex])
             
             selPhotoPreview?.selectBlock = { [weak self] model in
-                self?.handleSelectEvent(model: model)
+                var properties: [String: Any] = [:]
+                properties["from"] = self?.context?["from"]
                 
-                let action = "click_photo_preview_detail_select"
-                PhotoPreview.trackEvent(event: "Clean", action: action)
+                let selectAction = "click_photo_preview_detail_cancel_select"
+                let cancelAction = "click_photo_preview_detail_select"
+                let action = model.isSelected ? cancelAction : selectAction
+                PhotoPreview.trackEvent(event: "Clean", action: action, properties: properties)
+                
+                self?.handleSelectEvent(model: model)
             }
             
-            selPhotoPreview?.endDraggingBlock = {
-                let action = "click_photo_preview_detail_silde"
-                PhotoPreview.trackEvent(event: "Clean", action: action)
+            selPhotoPreview?.endDraggingBlock = { [weak self] in
+                var properties: [String: Any] = [:]
+                properties["from"] = self?.context?["from"]
+                
+                let action = "click_photo_preview_detail_slide"
+                PhotoPreview.trackEvent(event: "Clean", action: action, properties: properties)
             }
             
             selPhotoPreview?.scrollPositionBlock = { [weak self] model in
