@@ -58,6 +58,8 @@ private func clamp(_ minValue: Int, _ value: Int, _ maxValue: Int) -> Int {
 public typealias ZLAssetFromFrameProvider = ((Int) -> CGRect?)?
 
 public struct PhotoPreview {
+    public typealias PreviewVC = UIViewController & PhotosResetable
+    
     /// create a preview vc
     /// - Parameters:
     ///   - photos: the photos with selecte status
@@ -66,7 +68,7 @@ public struct PhotoPreview {
     /// - Returns: the navigation controller
     public static func createPhotoPreviewVC(
         photos: [ZLPhotoModel],
-        index: Int = 0,
+        index: Int,
         isMenuContextPreview: Bool = false,
         embedsInNavigationController: Bool = false,
         context: [String: Any]? = nil,
@@ -75,11 +77,20 @@ public struct PhotoPreview {
         fromFrameProvider: ZLAssetFromFrameProvider = nil,
         removingItemCallback: ((_ reason: String, _ model: ZLPhotoModel) -> Void)? = nil,
         removingAllCallback: (() -> Void)? = nil
-    ) -> UIViewController {
+    ) -> PreviewVC {
         PhotoInfoViewModel.shared.prepare()
         
+        let models: [ZLPhotoModel]
+        if photos.isEmpty {
+            // placeholder item for initial
+            let model = ZLPhotoModel(asset: .init())
+            models = [model]
+        } else {
+            models = photos
+        }
+        
         let vc = PhotoPreviewController(
-            photos: photos,
+            photos: models,
             index: index
         )
         vc.isMenuContextPreview = isMenuContextPreview
@@ -90,12 +101,18 @@ public struct PhotoPreview {
         vc.removingAllCallback = removingAllCallback
         vc.context = context
         
+        /*
         if embedsInNavigationController {
             return ZLImageNavController(rootViewController: vc)
         }
+        */
         
         return vc
     }
+}
+
+public protocol PhotosResetable {
+  func reset(photos: [ZLPhotoModel])
 }
 
 public protocol AppTracking {
@@ -249,7 +266,7 @@ class PhotoPreviewController: UIViewController {
         let title = NSLocalizedString("keep", comment: "")
         let image = UIImage(named: "ic_star_sparkle_filled_16")
         
-        let button = SpacingButton(type: .custom)
+        let button = ZLSpacingButton(type: .custom)
         button.titleEdgeInsets = . init(top: 0, left: 8, bottom: 0, right: 0)
         button.contentEdgeInsets = .init(top: 4, left: 8, bottom: 4, right: 12)
         button.backgroundColor = UIColor(white: 1.0, alpha: 0.2)
@@ -263,7 +280,7 @@ class PhotoPreviewController: UIViewController {
     }()
     
     private lazy var saveButton: UIButton = {
-        let button = SpacingButton(type: .custom)
+        let button = ZLSpacingButton(type: .custom)
         button.titleEdgeInsets = . init(top: 0, left: 8, bottom: 0, right: 0)
         button.contentEdgeInsets = .init(top: 4, left: 8, bottom: 4, right: 12)
         button.backgroundColor = UIColor(white: 1.0, alpha: 0.2)
@@ -278,7 +295,7 @@ class PhotoPreviewController: UIViewController {
         let image = UIImage(named: "ic_about_plain")
         let selectedImage = UIImage(named: "ic_about_colored")
         
-        let button = SpacingButton(type: .custom)
+        let button = ZLSpacingButton(type: .custom)
         button.addTarget(self, action: #selector(onInfoButtonEvent(_:)), for: .touchUpInside)
         button.setImage(image, for: .normal)
         button.setImage(selectedImage, for: .selected)
@@ -317,7 +334,7 @@ class PhotoPreviewController: UIViewController {
         return btn
     }()
     
-    private var selPhotoPreview: PhotoPreviewSelectedView?
+    private var selPhotoPreview: SelectedPhotoPreview?
     
     private var hasAppear = true
     
@@ -614,7 +631,7 @@ class PhotoPreviewController: UIViewController {
             selPhotoPreview = PhotoPreviewSelectedView(selModels: selModels, currentShowModel: arrDataSources[currentIndex])
             */
             
-            selPhotoPreview = PhotoPreviewSelectedView(selModels: self.arrDataSources, currentShowModel: arrDataSources[currentIndex])
+            selPhotoPreview = SelectedPhotoPreview(selModels: self.arrDataSources, currentShowModel: arrDataSources[currentIndex])
             
             selPhotoPreview?.selectBlock = { [weak self] model in
                 var properties: [String: Any] = [:]
@@ -671,7 +688,8 @@ class PhotoPreviewController: UIViewController {
         
         let settings: UserDefaults? = .init(suiteName: "bubble_settings")
         let show = (settings?.bool(forKey: "settings.qa.showsTestSettings")) ?? false
-        if show {
+        let enables = (context?["showsTestSettings"] as? Bool) ?? true
+        if show && enables {
           view.addSubview(saveButton)
           saveButton.translatesAutoresizingMaskIntoConstraints = false
           NSLayoutConstraint.activate([
@@ -844,10 +862,15 @@ class PhotoPreviewController: UIViewController {
             originalBtn.isHidden = !((currentModel.type == .image) || (currentModel.type == .livePhoto && !config.allowSelectLivePhoto) || (currentModel.type == .gif && !config.allowSelectGif))
         }
       
-      if isMenuContextPreview {
-        navView.isHidden = true
-        bottomView.isHidden = true
-      }
+        if isMenuContextPreview {
+            navView.isHidden = true
+            bottomView.isHidden = true
+        }
+        
+        let hidesNaviView = (context?["hidesNaviView"] as? Bool) ?? false
+        if hidesNaviView {
+            navView.isHidden = true
+        }
     }
     
     private func resetIndexLabelStatus() {
@@ -1265,6 +1288,19 @@ class PhotoPreviewController: UIViewController {
     
 }
 
+extension PhotoPreviewController: PhotosResetable {
+    func reset(photos: [ZLPhotoModel]) {
+        // update preview area
+        self.arrDataSources = photos
+        self.currentIndex = 0
+        self.indexBeforOrientationChanged = 0
+        self.collectionView.reloadData()
+        
+        // update select view
+        self.selPhotoPreview?.reset(photos: photos)
+    }
+}
+
 extension PhotoPreviewController {
     func addDebugGestureForTitleIndexLabel() {
         let tap = UITapGestureRecognizer(target: self, action: #selector(onTitleIndexLaelEvent))
@@ -1542,7 +1578,26 @@ extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDe
             baseCell = cell
         } else {
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: ZLPhotoPreviewCell.zl.identifier, for: indexPath) as! ZLPhotoPreviewCell
-
+            
+            let aspectFill = (context?["aspectFill"] as? Bool) ?? false
+            let disablesScaleBehavior = (context?["disablesScaleBehavior"] as? Bool) ?? false
+            
+            if aspectFill {
+                cell.preview.aspectFill = true
+            }
+            
+            if disablesScaleBehavior {
+                cell.preview.scrollView.isScrollEnabled = false
+                
+                let doubleTapItems = cell.preview.gestureRecognizers?.filter { tap in
+                    guard let tap = tap as? UITapGestureRecognizer, tap.numberOfTapsRequired == 2 else {
+                        return false
+                    }
+                    return true
+                }
+                doubleTapItems?.first?.isEnabled = false
+            }
+            
             cell.singleTapBlock = { [weak self] in
                 self?.tapPreviewCell()
             }
@@ -1578,7 +1633,7 @@ extension Int {
 
 // MARK: 下方显示的已选择照片列表
 
-class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, UICollectionViewDragDelegate, UICollectionViewDropDelegate {
+class SelectedPhotoPreview: UIView, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, UICollectionViewDragDelegate, UICollectionViewDropDelegate {
     static let itemLength: CGFloat = 48
     
     static var insetLength: CGFloat = UIScreen.main.bounds.width * 0.5 - itemLength * 0.5
@@ -1906,6 +1961,16 @@ class PhotoPreviewSelectedView: UIView, UICollectionViewDataSource, UICollection
         }
 
         return clamp(0, page, arrSelectedModels.count - 1)
+    }
+}
+
+extension SelectedPhotoPreview: PhotosResetable {
+    func reset(photos: [ZLPhotoModel]) {
+        self.arrSelectedModels = photos
+        if let first = photos.first {
+            self.currentShowModel = first
+        }
+        self.collectionView.reloadData()
     }
 }
 
@@ -2267,7 +2332,7 @@ class PhotoPreviewPopInteractiveTransition: UIPercentDrivenInteractiveTransition
 ///
 /// see: iphone - UIButton Text Margin / Padding - Stack Overflow
 /// ref: https://stackoverflow.com/questions/5363789/uibutton-text-margin-padding
-class SpacingButton: UIButton {
+class ZLSpacingButton: UIButton {
   override var intrinsicContentSize: CGSize {
     let baseSize = super.intrinsicContentSize
     return CGSize(

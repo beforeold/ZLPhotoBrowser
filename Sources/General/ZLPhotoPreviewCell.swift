@@ -237,7 +237,7 @@ class ZLPhotoPreviewCell: ZLPreviewBaseCell {
         return preview.image
     }
     
-    private lazy var preview: ZLPreviewView = {
+    lazy var preview: ZLPreviewView = {
         let view = ZLPreviewView()
         view.singleTapBlock = { [weak self] in
             self?.singleTapBlock?()
@@ -293,7 +293,7 @@ class ZLGifPreviewCell: ZLPreviewBaseCell {
         return preview.image
     }
     
-    private lazy var preview: ZLPreviewView = {
+    lazy var preview: ZLPreviewView = {
         let view = ZLPreviewView()
         view.singleTapBlock = { [weak self] in
             self?.singleTapBlock?()
@@ -362,7 +362,7 @@ class ZLGifPreviewCell: ZLPreviewBaseCell {
 
 class ZLLivePhotoPreviewCell: ZLPreviewBaseCell {
     
-    private lazy var imageView: UIImageView = {
+    lazy var imageView: UIImageView = {
         let view = UIImageView()
         view.contentMode = .scaleAspectFit
         return view
@@ -490,7 +490,7 @@ class ZLVideoPreviewCell: ZLPreviewBaseCell {
     
     private lazy var progressView = ZLProgressView()
     
-    private lazy var imageView: UIImageView = {
+    lazy var imageView: UIImageView = {
         let view = UIImageView()
         view.clipsToBounds = true
         view.contentMode = .scaleAspectFill
@@ -858,6 +858,12 @@ class ZLPreviewView: UIView {
         return view
     }()
     
+    var aspectFill = false {
+        didSet {
+            self.imageView.contentMode = aspectFill ? .scaleAspectFill : .scaleAspectFit
+        }
+    }
+    
     var image: UIImage? {
         get {
             return imageView.image
@@ -1027,6 +1033,16 @@ class ZLPreviewView: UIView {
     }
     
     func resetSubViewSize() {
+        if aspectFill {
+            ZLMainAsync(after: 0.01) {
+                self.scrollView.contentSize = self.bounds.size
+                self.containerView.frame = self.bounds
+                self.imageView.frame = self.containerView.bounds
+                self.scrollView.contentOffset = .zero
+            }
+            return
+        }
+        
         let size: CGSize
         if let model = model {
             if let ei = model.editImage {
