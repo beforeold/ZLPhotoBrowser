@@ -130,7 +130,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		84A0F0162A302E3F00C59FDD /* TestCustomPreviewViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestCustomPreviewViewController.swift; sourceTree = "<group>"; };
+		84A0F0162A302E3F00C59FDD /* TestCustomPreviewViewController.swift */ = {isa = PBXFileReference; indentWidth = 4; lastKnownFileType = sourcecode.swift; path = TestCustomPreviewViewController.swift; sourceTree = "<group>"; tabWidth = 4; };
 		BAFFA5482773B655007C3811 /* es-419 */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "es-419"; path = "es-419.lproj/Main.strings"; sourceTree = "<group>"; };
 		BAFFA5492773B655007C3811 /* es-419 */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "es-419"; path = "es-419.lproj/LaunchScreen.strings"; sourceTree = "<group>"; };
 		BAFFA54A2773B65B007C3811 /* pt-BR */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "pt-BR"; path = "pt-BR.lproj/Main.strings"; sourceTree = "<group>"; };

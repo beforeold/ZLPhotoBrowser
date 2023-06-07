@@ -50,25 +50,7 @@ class ZLPreviewBaseCell: UICollectionViewCell {
     @objc func previewVCScroll() {}
     
     func resetSubViewStatusWhenCellEndDisplay() {}
-    
-    var topCornerRadius: CGFloat = 0
-    
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        
-        let path = UIBezierPath(
-          roundedRect: self.bounds,
-          byRoundingCorners: [.topLeft, .topRight],
-          cornerRadii: CGSize(width: topCornerRadius, height: topCornerRadius)
-        )
-        
-        let maskLayer = CAShapeLayer()
-        maskLayer.frame = self.bounds
-        maskLayer.path = path.cgPath
-        
-        self.layer.mask = maskLayer
-    }
-    
+  
     func resizeImageView(imageView: UIImageView, asset: PHAsset) {
         let size = CGSize(width: asset.pixelWidth, height: asset.pixelHeight)
         var frame: CGRect = .zero

@@ -84,6 +84,7 @@ class TestCustomPreviewViewController: UIViewController {
       
       // let index = (0..<limit).randomElement()!
       let index = 0
+      let assetWidth = UIScreen.main.bounds.width - 2 * 16
       let vc = PhotoPreview.createPhotoPreviewVC(
           photos: assets,
           index: index,
@@ -94,7 +95,7 @@ class TestCustomPreviewViewController: UIViewController {
             "aspectFill": true,
             "disablesScaleBehavior": true,
             "assetInset": 16 as CGFloat,
-            "assetWidth": (UIScreen.main.bounds.width - 2 * 16),
+            "assetWidth": assetWidth,
             "assetHeight": 240 as CGFloat,
             "thumbnailLength": 40 as CGFloat,
             "thumbnailContainerHeight": 64 as CGFloat,
@@ -114,9 +115,9 @@ class TestCustomPreviewViewController: UIViewController {
     self.addChild(vc)
     self.view.addSubview(vc.view)
     vc.view.frame = CGRect(
-      x: 0,
+      x: 16,
       y: 100,
-      width: view.bounds.width,
+      width: assetWidth,
       height: 240 + 64
     )
   }

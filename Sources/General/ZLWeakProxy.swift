@@ -310,7 +310,10 @@ class PhotoPreviewController: UIViewController {
     
     private lazy var bottomView: UIView = {
         let view = UIView()
+        /*
         view.backgroundColor = .zl.bottomToolViewBgColorOfPreviewVC
+        */
+        view.backgroundColor = .clear
         return view
     }()
     
@@ -458,12 +461,6 @@ class PhotoPreviewController: UIViewController {
         updateCurrentIndex(currentIndex)
         
         setupGestureDepend(on: collectionView)
-        
-        
-    #if DEBUG
-        self.view.backgroundColor = .lightGray.withAlphaComponent(0.3)
-        self.collectionView.backgroundColor = .blue.withAlphaComponent(0.3)
-    #endif
     }
     
     fileprivate func setupGestureDepend(on scrollView: UIScrollView) {
@@ -514,23 +511,13 @@ class PhotoPreviewController: UIViewController {
             navH = 0
         }
         
-        if let _ = context?["assetInset"] as? CGFloat {
-            // custom inset behavior
-            collectionView.frame = CGRect(
-                x: 0,
-                y: navH,
-                width: view.frame.width,
-                height: getItemHeight()
-            )
-        } else {
-            // default inset behavior
-            collectionView.frame = CGRect(
-                x: -ZLPhotoPreviewController.colItemSpacing / 2,
-                y: navH,
-                width: view.frame.width + ZLPhotoPreviewController.colItemSpacing,
-                height: getItemHeight()
-            )
-        }
+        // default inset behavior
+        collectionView.frame = CGRect(
+            x: -ZLPhotoPreviewController.colItemSpacing / 2,
+            y: navH,
+            width: view.frame.width + ZLPhotoPreviewController.colItemSpacing,
+            height: getItemHeight()
+        )
       
         if isMenuContextPreview {
           collectionView.frame = view.bounds
@@ -544,9 +531,30 @@ class PhotoPreviewController: UIViewController {
         indexLabel.frame = selectBtn.bounds
         
         refreshBottomViewFrame()
+        
+        checkTopMask()
     }
     
     // MARK: - private
+    private func checkTopMask() {
+        guard let _ = context?["assetInset"] else {
+            return
+        }
+        
+        let topCornerRadius: CGFloat = 20
+        let path = UIBezierPath(
+            roundedRect: self.view.bounds,
+          byRoundingCorners: [.topLeft, .topRight],
+          cornerRadii: CGSize(width: topCornerRadius, height: topCornerRadius)
+        )
+        
+        let maskLayer = CAShapeLayer()
+        maskLayer.frame = self.view.bounds
+        maskLayer.path = path.cgPath
+        
+        self.view.layer.mask = maskLayer
+    }
+    
     private func trackPageExposure() {
         // track exposure
         var properties: [String: Any] = [:]
@@ -644,7 +652,7 @@ class PhotoPreviewController: UIViewController {
     }
     
     private func setupUI() {
-        view.backgroundColor = .zl.previewVCBgColor
+        view.backgroundColor = UIColor(red: 23 / 255.0, green: 23 / 255.0, blue: 23 / 255.0, alpha: 1)
         
         let config = ZLPhotoConfiguration.default()
         
@@ -1583,11 +1591,7 @@ extension PhotoPreviewController {
     }
     
     var usedSpacePerItem: CGFloat {
-        if let _ = context?["assetInset"] as? CGFloat {
-            return view.bounds.width
-        } else {
-            return view.bounds.width + ZLPhotoPreviewController.colItemSpacing
-        }
+        return view.bounds.width + ZLPhotoPreviewController.colItemSpacing
     }
     
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
@@ -1611,27 +1615,15 @@ extension PhotoPreviewController {
 extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumInteritemSpacingForSectionAt section: Int) -> CGFloat {
-        if let assetInset = context?["assetInset"] as? CGFloat {
-            return 2 * assetInset
-        }
-        
         return ZLPhotoPreviewController.colItemSpacing
     }
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumLineSpacingForSectionAt section: Int) -> CGFloat {
-        if let assetInset = context?["assetInset"] as? CGFloat {
-            return 2 * assetInset
-        }
-        
         return ZLPhotoPreviewController.colItemSpacing
     }
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
         var inset = ZLPhotoPreviewController.colItemSpacing / 2
-        if let assetInset = context?["assetInset"] as? CGFloat {
-            inset = assetInset
-        }
-        
         if isMenuContextPreview {
             inset = 0
         }
@@ -1734,10 +1726,6 @@ extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDe
         
         baseCell.singleTapBlock = { [weak self] in
             self?.tapPreviewCell()
-        }
-        
-        if let _ = context?["assetInset"] as? CGFloat {
-            baseCell.topCornerRadius = 20
         }
         
         if let configureCell = context?["configureCell"] as? (UICollectionViewCell, IndexPath) -> Void {
