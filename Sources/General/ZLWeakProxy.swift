@@ -138,7 +138,7 @@ fileprivate struct LayoutContext {
 }
 
 public protocol PhotosResetable {
-  func reset(photos: [ZLPhotoModel])
+    func reset(photos: [ZLPhotoModel])
 }
 
 public protocol AppTracking {
@@ -773,16 +773,15 @@ class PhotoPreviewController: UIViewController {
             button.widthAnchor.constraint(equalToConstant: 30),
             button.heightAnchor.constraint(equalToConstant: 30),
         ]
-        
-        let trailing: CGFloat
-        if let assetInset = context?["assetInset"] as? CGFloat {
-            trailing = 10 + assetInset
-            constraints.append(button.bottomAnchor.constraint(equalTo: collectionView.bottomAnchor, constant: -10))
+        if let _ = context?["assetInset"] as? CGFloat {
+            let item = button.bottomAnchor.constraint(equalTo: collectionView.bottomAnchor, constant: -10)
+            constraints.append(item)
         } else {
-            trailing = 14
-            constraints.append(button.centerYAnchor.constraint(equalTo: keepButton.centerYAnchor))
+            let item = button.centerYAnchor.constraint(equalTo: keepButton.centerYAnchor)
+            constraints.append(item)
         }
-        constraints.append(button.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -trailing))
+        let item = button.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -14)
+        constraints.append(item)
 
         NSLayoutConstraint.activate(constraints)
         
@@ -812,13 +811,11 @@ class PhotoPreviewController: UIViewController {
             return
         }
         
-        let assetInset = (context?["assetInset"] as? CGFloat) ?? 0
         let margin: CGFloat = 12
-        let trailing = assetInset + assetInset
         view.addSubview(topRightIndexView)
         topRightIndexView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            topRightIndexView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -trailing),
+            topRightIndexView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -margin),
             topRightIndexView.topAnchor.constraint(equalTo: view.topAnchor, constant: margin),
             topRightIndexView.heightAnchor.constraint(equalToConstant: 22),
         ])
@@ -1323,6 +1320,12 @@ class PhotoPreviewController: UIViewController {
     }
     
     private func tapPreviewCell() {
+        if let tapPreviewCellCallback = context?["tapPreviewCellCallback"] as? (PHAsset, Int) -> Void {
+            let model = arrDataSources[currentIndex]
+            tapPreviewCellCallback(model.asset, currentIndex)
+            return
+        }
+        
         hideNavView.toggle()
         
         let currentCell = collectionView.cellForItem(at: IndexPath(row: currentIndex, section: 0))
