@@ -376,6 +376,9 @@ class ViewController: UIViewController {
     }
     
     @objc func onCreatePhotosPreview() {
+        let testVC = UINavigationController(rootViewController: TestCustomPreviewViewController())
+        show(testVC, sender: nil)
+        
         let options = PHFetchOptions()
         options.predicate = NSPredicate(format: "mediaType == %ld", PHAssetMediaType.image.rawValue)
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]

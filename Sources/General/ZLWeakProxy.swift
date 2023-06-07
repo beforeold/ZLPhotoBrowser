@@ -101,14 +101,40 @@ public struct PhotoPreview {
         vc.removingAllCallback = removingAllCallback
         vc.context = context
         
-        /*
         if embedsInNavigationController {
             return ZLImageNavController(rootViewController: vc)
         }
-        */
         
         return vc
     }
+}
+
+/// layout metrics for the preview context
+fileprivate struct LayoutContext {
+    let context: [String: Any]?
+    
+    let assetInset: CGFloat
+    let assetWidth: CGFloat
+    let assetHeight: CGFloat
+    let thumbnailLength: CGFloat
+    let thumbnailContainerHeight: CGFloat
+    let thumbnailSpacing: CGFloat
+    let thumbnailCornerRadius: CGFloat
+    let thumbnailCornerPadding: CGFloat
+    
+    init(context: [String: Any]?) {
+        self.context = context
+        
+        self.assetInset = (context?["assetInset"] as? CGFloat) ?? 0
+        self.assetWidth = (context?["assetWidth"] as? CGFloat) ?? 0
+        self.assetHeight = (context?["assetHeight"] as? CGFloat) ?? 0
+        self.thumbnailLength = (context?["thumbnailLength"] as? CGFloat) ?? 40
+        self.thumbnailContainerHeight = (context?["thumbnailContainerHeight"] as? CGFloat) ?? 80
+        self.thumbnailSpacing = (context?["thumbnailSpacing"] as? CGFloat) ?? 8
+        self.thumbnailCornerRadius = (context?["thumbnailCornerRadius"] as? CGFloat) ?? 0
+        self.thumbnailCornerPadding = (context?["thumbnailCornerPadding"] as? CGFloat) ?? 2
+    }
+    
 }
 
 public protocol PhotosResetable {
@@ -181,6 +207,18 @@ class PhotoPreviewController: UIViewController {
         }
     }
     
+    class MyView: UIView {
+        override var frame: CGRect {
+            didSet {
+                print("setframe myview")
+            }
+        }
+    }
+    
+    override func loadView() {
+        self.view = MyView(frame: UIScreen.main.bounds)
+    }
+    
     lazy var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .horizontal
@@ -191,6 +229,7 @@ class PhotoPreviewController: UIViewController {
         view.delegate = self
         view.isPagingEnabled = true
         view.showsHorizontalScrollIndicator = false
+        view.contentInsetAdjustmentBehavior = .never
         
         ZLPhotoPreviewCell.zl.register(view)
         ZLGifPreviewCell.zl.register(view)
@@ -234,6 +273,7 @@ class PhotoPreviewController: UIViewController {
         return btn
     }()
     
+    /// the index label on the select button
     private lazy var indexLabel: UILabel = {
         let label = UILabel()
         label.backgroundColor = .zl.indexLabelBgColor
@@ -252,6 +292,18 @@ class PhotoPreviewController: UIViewController {
         label.textColor = .white
         label.textAlignment = .center
         return label
+    }()
+    
+    private lazy var topRightIndexView: UIButton = {
+        let button = UIButton(type: .custom)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 11, weight: .regular)
+        button.setTitleColor(.white, for: .normal)
+        button.contentEdgeInsets = .init(top: 4, left: 8, bottom: 4, right: 8)
+        button.isUserInteractionEnabled = false
+        button.layer.cornerRadius = 11
+        button.backgroundColor = UIColor.black.withAlphaComponent(0.2)
+        
+        return button
     }()
     
     var isMenuContextPreview = false
@@ -344,6 +396,10 @@ class PhotoPreviewController: UIViewController {
     
     private var orientation: UIInterfaceOrientation = .unknown
     
+    fileprivate lazy var layoutContext: LayoutContext = {
+        return LayoutContext(context: self.context)
+    }()
+    
     /// 是否在点击确定时候，当未选择任何照片时候，自动选择当前index的照片
     var autoSelectCurrentIfNotSelectAnyone = true
     
@@ -363,10 +419,11 @@ class PhotoPreviewController: UIViewController {
     }
     
     init(photos: [ZLPhotoModel], index: Int, showBottomViewAndSelectBtn: Bool = true) {
-        arrDataSources = photos
+        self.arrDataSources = photos
         self.showBottomViewAndSelectBtn = showBottomViewAndSelectBtn
-        currentIndex = index
-        indexBeforOrientationChanged = index
+        self.currentIndex = index
+        self.indexBeforOrientationChanged = index
+        
         super.init(nibName: nil, bundle: nil)
     }
     
@@ -401,6 +458,12 @@ class PhotoPreviewController: UIViewController {
         updateCurrentIndex(currentIndex)
         
         setupGestureDepend(on: collectionView)
+        
+        
+    #if DEBUG
+        self.view.backgroundColor = .lightGray.withAlphaComponent(0.3)
+        self.collectionView.backgroundColor = .blue.withAlphaComponent(0.3)
+    #endif
     }
     
     fileprivate func setupGestureDepend(on scrollView: UIScrollView) {
@@ -434,34 +497,40 @@ class PhotoPreviewController: UIViewController {
         navigationController?.setNavigationBarHidden(false, animated: animated)
     }
     
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
+    override func viewWillLayoutSubviews() {
+        super.viewWillLayoutSubviews()
         
         var insets = UIEdgeInsets(top: 20, left: 0, bottom: 0, right: 0)
         if #available(iOS 11.0, *) {
             insets = self.view.safeAreaInsets
         }
         insets.top = max(20, insets.top)
-        
-        /*
-        collectionView.frame = CGRect(
-            x: -ZLPhotoPreviewController.colItemSpacing / 2,
-            y: 0,
-            width: view.frame.width + ZLPhotoPreviewController.colItemSpacing,
-            height: view.frame.height
-        )
-        */
-        
-        let navH = insets.top + 44
+
+        var navH = insets.top + 44
         navView.frame = CGRect(x: 0, y: 0, width: view.frame.width, height: navH)
         navBlurView?.frame = navView.bounds
         
-        collectionView.frame = CGRect(
-            x: -ZLPhotoPreviewController.colItemSpacing / 2,
-            y: navH,
-            width: view.frame.width + ZLPhotoPreviewController.colItemSpacing,
-            height: getItemHeight()
-        )
+        if let hidesNavView = context?["hidesNavView"] as? Bool, hidesNavView {
+            navH = 0
+        }
+        
+        if let _ = context?["assetInset"] as? CGFloat {
+            // custom inset behavior
+            collectionView.frame = CGRect(
+                x: 0,
+                y: navH,
+                width: view.frame.width,
+                height: getItemHeight()
+            )
+        } else {
+            // default inset behavior
+            collectionView.frame = CGRect(
+                x: -ZLPhotoPreviewController.colItemSpacing / 2,
+                y: navH,
+                width: view.frame.width + ZLPhotoPreviewController.colItemSpacing,
+                height: getItemHeight()
+            )
+        }
       
         if isMenuContextPreview {
           collectionView.frame = view.bounds
@@ -475,18 +544,6 @@ class PhotoPreviewController: UIViewController {
         indexLabel.frame = selectBtn.bounds
         
         refreshBottomViewFrame()
-        
-        let ori = UIApplication.shared.statusBarOrientation
-        if ori != orientation {
-            orientation = ori
-            
-            collectionView.performBatchUpdates(nil) { _ in
-                self.collectionView.setContentOffset(
-                    CGPoint(x: (self.view.frame.width + ZLPhotoPreviewController.colItemSpacing) * CGFloat(self.indexBeforOrientationChanged), y: 0),
-                    animated: false
-                )
-            }
-        }
     }
     
     // MARK: - private
@@ -540,6 +597,9 @@ class PhotoPreviewController: UIViewController {
         if #available(iOS 11.0, *) {
             insets = view.safeAreaInsets
         }
+        
+        let thumbnailContainerHeight = self.layoutContext.thumbnailContainerHeight
+        
         var bottomViewH = ZLLayout.bottomToolViewH
         var showSelPhotoPreview = false
         if ZLPhotoConfiguration.default().showSelectedPhotoPreview
@@ -548,13 +608,13 @@ class PhotoPreviewController: UIViewController {
 //            if !nav.arrSelectedModels.isEmpty {
                 showSelPhotoPreview = true
                 bottomViewH += ZLPhotoPreviewController.selPhotoPreviewH
-                selPhotoPreview?.frame = CGRect(x: 0, y: 0, width: view.frame.width, height: Self.selPhotoPreviewH)
+                selPhotoPreview?.frame = CGRect(x: 0, y: 0, width: view.frame.width, height: thumbnailContainerHeight)
 //            }
         }
         let btnH = ZLLayout.bottomToolBtnH
         
         // ignore ZLLayout.bottomToolViewH
-        bottomViewH = Self.selPhotoPreviewH
+        bottomViewH = thumbnailContainerHeight
         bottomView.layer.masksToBounds = true
         doneBtn.isHidden = true
         
@@ -585,7 +645,6 @@ class PhotoPreviewController: UIViewController {
     
     private func setupUI() {
         view.backgroundColor = .zl.previewVCBgColor
-        automaticallyAdjustsScrollViewInsets = false
         
         let config = ZLPhotoConfiguration.default()
         
@@ -626,12 +685,11 @@ class PhotoPreviewController: UIViewController {
         }
         
         if config.showSelectedPhotoPreview {
-            /*
-            let selModels = (navigationController as? ZLImageNavControllerProtocol)?.arrSelectedModels ?? []
-            selPhotoPreview = PhotoPreviewSelectedView(selModels: selModels, currentShowModel: arrDataSources[currentIndex])
-            */
-            
-            selPhotoPreview = SelectedPhotoPreview(selModels: self.arrDataSources, currentShowModel: arrDataSources[currentIndex])
+            selPhotoPreview = SelectedPhotoPreview(
+                selModels: self.arrDataSources,
+                currentShowModel: arrDataSources[currentIndex],
+                layoutContext: layoutContext
+            )
             
             selPhotoPreview?.selectBlock = { [weak self] model in
                 var properties: [String: Any] = [:]
@@ -702,14 +760,27 @@ class PhotoPreviewController: UIViewController {
         let button = selectBtn
         view.addSubview(button)
         button.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            button.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -18),
-            button.centerYAnchor.constraint(equalTo: keepButton.centerYAnchor),
+        
+        var constraints = [
             button.widthAnchor.constraint(equalToConstant: 30),
             button.heightAnchor.constraint(equalToConstant: 30),
-        ])
+        ]
+        
+        let trailing: CGFloat
+        if let assetInset = context?["assetInset"] as? CGFloat {
+            trailing = 10 + assetInset
+            constraints.append(button.bottomAnchor.constraint(equalTo: collectionView.bottomAnchor, constant: -10))
+        } else {
+            trailing = 14
+            constraints.append(button.centerYAnchor.constraint(equalTo: keepButton.centerYAnchor))
+        }
+        constraints.append(button.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -trailing))
+
+        NSLayoutConstraint.activate(constraints)
         
         setupInfoView()
+        
+        setupTopRightIndexView()
         
         view.bringSubviewToFront(navView)
     }
@@ -725,6 +796,23 @@ class PhotoPreviewController: UIViewController {
             infoVC.view.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             infoVC.view.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             infoVC.view.topAnchor.constraint(equalTo: navView.bottomAnchor, constant: 22),
+        ])
+    }
+    
+    private func setupTopRightIndexView() {
+        guard let showsTopRightIndexView = context?["showsTopRightIndexView"] as? Bool, showsTopRightIndexView else {
+            return
+        }
+        
+        let assetInset = (context?["assetInset"] as? CGFloat) ?? 0
+        let margin: CGFloat = 12
+        let trailing = assetInset + assetInset
+        view.addSubview(topRightIndexView)
+        topRightIndexView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            topRightIndexView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -trailing),
+            topRightIndexView.topAnchor.constraint(equalTo: view.topAnchor, constant: margin),
+            topRightIndexView.heightAnchor.constraint(equalToConstant: 22),
         ])
     }
     
@@ -824,7 +912,10 @@ class PhotoPreviewController: UIViewController {
         }
         selectBtn.isSelected = arrDataSources[currentIndex].isSelected
         resetIndexLabelStatus()
-        titleIndexLabel.text = "\(currentIndex + 1)/\(arrDataSources.count)"
+        
+        let indexText = "\(currentIndex + 1)/\(arrDataSources.count)"
+        titleIndexLabel.text = indexText
+        topRightIndexView.setTitle(indexText, for: .normal)
         
         guard showBottomViewAndSelectBtn else {
             selectBtn.isHidden = true
@@ -867,8 +958,8 @@ class PhotoPreviewController: UIViewController {
             bottomView.isHidden = true
         }
         
-        let hidesNaviView = (context?["hidesNaviView"] as? Bool) ?? false
-        if hidesNaviView {
+        let hidesNavView = (context?["hidesNavView"] as? Bool) ?? false
+        if hidesNavView {
             navView.isHidden = true
         }
     }
@@ -1480,7 +1571,8 @@ extension PhotoPreviewController {
         NotificationCenter.default.post(name: ZLPhotoPreviewController.previewVCScrollNotification, object: nil)
         
         let offset = scrollView.contentOffset
-        var page = Int(round(offset.x / (view.bounds.width + ZLPhotoPreviewController.colItemSpacing)))
+        
+        var page = Int(round(offset.x / usedSpacePerItem))
         page = clamp(0, page, arrDataSources.count - 1)
         if page == currentIndex {
             return
@@ -1488,6 +1580,14 @@ extension PhotoPreviewController {
         
         updateCurrentIndex(page)
         selPhotoPreview?.currentShowModelChanged(model: arrDataSources[currentIndex])
+    }
+    
+    var usedSpacePerItem: CGFloat {
+        if let _ = context?["assetInset"] as? CGFloat {
+            return view.bounds.width
+        } else {
+            return view.bounds.width + ZLPhotoPreviewController.colItemSpacing
+        }
     }
     
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
@@ -1511,26 +1611,50 @@ extension PhotoPreviewController {
 extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumInteritemSpacingForSectionAt section: Int) -> CGFloat {
+        if let assetInset = context?["assetInset"] as? CGFloat {
+            return 2 * assetInset
+        }
+        
         return ZLPhotoPreviewController.colItemSpacing
     }
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumLineSpacingForSectionAt section: Int) -> CGFloat {
+        if let assetInset = context?["assetInset"] as? CGFloat {
+            return 2 * assetInset
+        }
+        
         return ZLPhotoPreviewController.colItemSpacing
     }
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
-      var inset = ZLPhotoPreviewController.colItemSpacing / 2
-      if isMenuContextPreview {
-        inset = 0
-      }
+        var inset = ZLPhotoPreviewController.colItemSpacing / 2
+        if let assetInset = context?["assetInset"] as? CGFloat {
+            inset = assetInset
+        }
+        
+        if isMenuContextPreview {
+            inset = 0
+        }
         return UIEdgeInsets(top: 0, left: inset, bottom: 0, right: inset)
     }
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        return CGSize(width: view.bounds.width, height: getItemHeight())
+        return CGSize(width: getItemWidth(), height: getItemHeight())
+    }
+    
+    func getItemWidth() -> CGFloat {
+        if let assetWidth = context?["assetWidth"] as? CGFloat {
+            return assetWidth
+        }
+        
+        return view.bounds.width
     }
     
     func getItemHeight() -> CGFloat {
+        if let assetHeight = context?["assetHeight"] as? CGFloat {
+            return assetHeight
+        }
+        
         if isMenuContextPreview {
           return view.bounds.height
         }
@@ -1588,6 +1712,7 @@ extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDe
             
             if disablesScaleBehavior {
                 cell.preview.scrollView.isScrollEnabled = false
+                cell.preview.scrollView.pinchGestureRecognizer?.isEnabled = false
                 
                 let doubleTapItems = cell.preview.gestureRecognizers?.filter { tap in
                     guard let tap = tap as? UITapGestureRecognizer, tap.numberOfTapsRequired == 2 else {
@@ -1609,6 +1734,14 @@ extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDe
         
         baseCell.singleTapBlock = { [weak self] in
             self?.tapPreviewCell()
+        }
+        
+        if let _ = context?["assetInset"] as? CGFloat {
+            baseCell.topCornerRadius = 20
+        }
+        
+        if let configureCell = context?["configureCell"] as? (UICollectionViewCell, IndexPath) -> Void {
+            configureCell(baseCell, indexPath)
         }
         
         return baseCell
@@ -1634,21 +1767,29 @@ extension Int {
 // MARK: 下方显示的已选择照片列表
 
 class SelectedPhotoPreview: UIView, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, UICollectionViewDragDelegate, UICollectionViewDropDelegate {
-    static let itemLength: CGFloat = 48
-    
-    static var insetLength: CGFloat = UIScreen.main.bounds.width * 0.5 - itemLength * 0.5
-    
-    static let minimumSpacing: CGFloat = 12
-    
     typealias ZLPhotoPreviewSelectedViewCell = PhotoPreviewSelectedViewCell
     
     private lazy var collectionView: UICollectionView = {
+        // minus a bit to silence UICollectionViewFlowLayout layout warning
+        var verticalInset = 0.5 * (self.layoutContext.thumbnailContainerHeight - self.layoutContext.thumbnailLength)
+        verticalInset -= 0.5
+        
+        let minimumSpacing = self.layoutContext.thumbnailSpacing
+ 
+        let itemLength = self.layoutContext.thumbnailLength
+        let forCenterInset = 0.5 * (UIScreen.main.bounds.width - itemLength)
+        
         let layout = UICollectionViewFlowLayout()
-        layout.itemSize = CGSize(width: Self.itemLength, height: Self.itemLength)
-        layout.minimumLineSpacing = Self.minimumSpacing
-        layout.minimumInteritemSpacing = Self.minimumSpacing
+        layout.itemSize = CGSize(width: itemLength, height: itemLength)
+        layout.minimumLineSpacing = minimumSpacing
+        layout.minimumInteritemSpacing = minimumSpacing
         layout.scrollDirection = .horizontal
-        layout.sectionInset = UIEdgeInsets(top: 10, left: Self.insetLength, bottom: 10, right: Self.insetLength)
+        layout.sectionInset = UIEdgeInsets(
+            top: verticalInset,
+            left: forCenterInset,
+            bottom: verticalInset,
+            right: forCenterInset
+        )
         
         let view = UICollectionView(frame: .zero, collectionViewLayout: layout)
         view.backgroundColor = .clear
@@ -1656,6 +1797,7 @@ class SelectedPhotoPreview: UIView, UICollectionViewDataSource, UICollectionView
         view.delegate = self
         view.showsHorizontalScrollIndicator = false
         view.alwaysBounceHorizontal = true
+        view.contentInsetAdjustmentBehavior = .never
         ZLPhotoPreviewSelectedViewCell.zl.register(view)
         
         // no need for reordering, thus disable drag interaction
@@ -1683,6 +1825,8 @@ class SelectedPhotoPreview: UIView, UICollectionViewDataSource, UICollectionView
     
     var ignoresDidScroll = false
     
+    fileprivate var layoutContext: LayoutContext!
+    
     /// callback on didSelect item
     var selectBlock: ((ZLPhotoModel) -> Void)?
     
@@ -1697,9 +1841,15 @@ class SelectedPhotoPreview: UIView, UICollectionViewDataSource, UICollectionView
     
     var endSortBlock: (([ZLPhotoModel]) -> Void)?
     
-    init(selModels: [ZLPhotoModel], currentShowModel: ZLPhotoModel) {
-        arrSelectedModels = selModels
+    fileprivate init(
+        selModels: [ZLPhotoModel],
+        currentShowModel: ZLPhotoModel,
+        layoutContext: LayoutContext
+    ) {
+        self.arrSelectedModels = selModels
         self.currentShowModel = currentShowModel
+        self.layoutContext = layoutContext
+        
         super.init(frame: .zero)
         
         setupUI()
@@ -1717,13 +1867,15 @@ class SelectedPhotoPreview: UIView, UICollectionViewDataSource, UICollectionView
         view.isUserInteractionEnabled = false
         view.layer.borderColor = borderColor.cgColor
         view.layer.borderWidth = 2
+        view.layer.cornerRadius = self.layoutContext.thumbnailCornerRadius
         addSubview(view)
         
         // center the focus view
+        let itemLength = self.layoutContext.thumbnailLength
         view.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            view.widthAnchor.constraint(equalToConstant: Self.itemLength),
-            view.heightAnchor.constraint(equalToConstant: Self.itemLength),
+            view.widthAnchor.constraint(equalToConstant: itemLength),
+            view.heightAnchor.constraint(equalToConstant: itemLength),
             view.centerXAnchor.constraint(equalTo: collectionView.centerXAnchor),
             view.centerYAnchor.constraint(equalTo: collectionView.centerYAnchor),
         ])
@@ -1737,9 +1889,7 @@ class SelectedPhotoPreview: UIView, UICollectionViewDataSource, UICollectionView
     override func layoutSubviews() {
         super.layoutSubviews()
         
-        let top: CGFloat = 10
-        let height = PhotoPreviewController.selPhotoPreviewH - 2 * top
-        collectionView.frame = CGRect(x: 0, y: top, width: bounds.width, height: height)
+        self.collectionView.frame = self.bounds
         
         if let index = arrSelectedModels.firstIndex(where: { $0 == self.currentShowModel }) {
             collectionView.scrollToItem(at: IndexPath(row: index, section: 0), at: .centeredHorizontally, animated: false)
@@ -1889,13 +2039,13 @@ class SelectedPhotoPreview: UIView, UICollectionViewDataSource, UICollectionView
         cell.model = model
         
         let isSelected = model.isSelected
-        let borderColor = UIColor(red: 95 / 255.0, green: 112 / 255.0, blue: 254 / 255.0, alpha: 1.0)
         let selectedImage = UIImage(named: "ic_checkbox_selected") ?? .zl.getImage("zl_btn_selected")
 
-        cell.imageView.layer.borderColor = borderColor.cgColor
+        cell.imageView.layer.cornerRadius = self.layoutContext.thumbnailCornerRadius
         cell.hudView.isHidden = true
         cell.checkmarkImageView.image = selectedImage
         cell.checkmarkImageView.isHidden = !isSelected
+        cell.cornerPadding = self.layoutContext.thumbnailCornerPadding
         
         return cell
     }
@@ -1947,13 +2097,17 @@ class SelectedPhotoPreview: UIView, UICollectionViewDataSource, UICollectionView
     
     func scrollViewWillEndDragging(_ scrollView: UIScrollView, withVelocity velocity: CGPoint, targetContentOffset: UnsafeMutablePointer<CGPoint>) {
         let index = properIndexForRestPosition(offset: targetContentOffset.pointee)
-        targetContentOffset.pointee.x = Double(index) * (Self.itemLength + Self.minimumSpacing)
+        targetContentOffset.pointee.x = Double(index) * usedSpacePerItem
+    }
+    
+    var usedSpacePerItem: CGFloat {
+        return self.layoutContext.thumbnailLength + self.layoutContext.thumbnailSpacing
     }
     
     /// find proper index to rest the scroll view at current offset
     func properIndexForRestPosition(offset: CGPoint) -> Int {
         let value = Int(offset.x)
-        let base = Int(Self.itemLength + Self.minimumSpacing)
+        let base = Int(usedSpacePerItem)
         var page = value / base
         let leftValue = value % base
         if leftValue > base / 2 {
@@ -2025,6 +2179,16 @@ class PhotoPreviewSelectedViewCell: UICollectionViewCell {
         }
     }
     
+    private var corners: [NSLayoutConstraint]!
+    
+    var cornerPadding: CGFloat = 2 {
+        didSet {
+            corners.forEach {
+                $0.constant = -cornerPadding
+            }
+        }
+    }
+    
     override init(frame: CGRect) {
         super.init(frame: frame)
         
@@ -2050,10 +2214,11 @@ class PhotoPreviewSelectedViewCell: UICollectionViewCell {
         
         contentView.addSubview(checkmarkImageView)
         checkmarkImageView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
+        corners = [
             checkmarkImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -2),
             checkmarkImageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -2),
-        ])
+        ]
+        NSLayoutConstraint.activate(corners)
     }
     
     @available(*, unavailable)
@@ -2123,6 +2288,16 @@ class PhotoPreviewSelectedViewCell: UICollectionViewCell {
 extension ZLImageNavController: ZLImageNavControllerProtocol {
     
 }
+
+extension ZLImageNavController: PhotosResetable {
+    func reset(photos: [ZLPhotoModel]) {
+        guard let topVC = topViewController as? PhotosResetable else {
+            return
+        }
+        topVC.reset(photos: photos)
+    }
+}
+
 
 public protocol ZLImageNavControllerProtocol: UINavigationController {
   
