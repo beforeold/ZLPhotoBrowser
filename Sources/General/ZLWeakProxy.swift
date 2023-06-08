@@ -1433,8 +1433,8 @@ extension PhotoPreviewController: PhotosResetable {
     
     private func reset(photos: [ZLPhotoModel]) {
         self.arrDataSources = photos
-        self.currentIndex = 0
         self.indexBeforOrientationChanged = 0
+        self.updateCurrentIndex(0)
         self.collectionView.reloadData()
         self.collectionView.contentOffset = .zero
         
