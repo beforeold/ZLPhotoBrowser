@@ -137,8 +137,9 @@ fileprivate struct LayoutContext {
     
 }
 
-public protocol PhotosResetable {
-    func reset(photos: [ZLPhotoModel])
+public protocol PhotosResetable: AnyObject {
+    var photos: [ZLPhotoModel] { get set }
+    func refreshSelection()
 }
 
 public protocol AppTracking {
@@ -462,6 +463,18 @@ class PhotoPreviewController: UIViewController {
         updateCurrentIndex(currentIndex)
         
         setupGestureDepend(on: collectionView)
+        
+        let ori = UIApplication.shared.statusBarOrientation
+        if ori != orientation {
+            orientation = ori
+            
+            collectionView.performBatchUpdates(nil) { _ in
+                self.collectionView.setContentOffset(
+                    CGPoint(x: (self.view.frame.width + ZLPhotoPreviewController.colItemSpacing) * CGFloat(self.indexBeforOrientationChanged), y: 0),
+                    animated: false
+                )
+            }
+        }
     }
     
     fileprivate func setupGestureDepend(on scrollView: UIScrollView) {
@@ -1393,15 +1406,31 @@ class PhotoPreviewController: UIViewController {
 }
 
 extension PhotoPreviewController: PhotosResetable {
-    func reset(photos: [ZLPhotoModel]) {
-        // update preview area
+    var photos: [ZLPhotoModel] {
+        get {
+            return arrDataSources
+        }
+        
+        set {
+            // update preview area
+            self.reset(photos: newValue)
+        }
+    }
+    
+    private func reset(photos: [ZLPhotoModel]) {
         self.arrDataSources = photos
         self.currentIndex = 0
         self.indexBeforOrientationChanged = 0
         self.collectionView.reloadData()
+        self.collectionView.contentOffset = .zero
         
         // update select view
-        self.selPhotoPreview?.reset(photos: photos)
+        self.selPhotoPreview?.photos = photos
+    }
+    
+    func refreshSelection() {
+        self.resetSubViewStatus()
+        self.selPhotoPreview?.refreshSelection()
     }
 }
 
@@ -2044,6 +2073,16 @@ class SelectedPhotoPreview: UIView, UICollectionViewDataSource, UICollectionView
         return cell
     }
     
+    func reconfigureVisiableCells() {
+        let cells = collectionView.visibleCells.compactMap { cell in
+            return cell as? ZLPhotoPreviewSelectedViewCell
+        }
+        
+        cells.forEach { cell in
+            cell.checkmarkImageView.isHidden = !cell.model.isSelected
+        }
+    }
+    
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         guard !isDraging else {
             return
@@ -2113,12 +2152,27 @@ class SelectedPhotoPreview: UIView, UICollectionViewDataSource, UICollectionView
 }
 
 extension SelectedPhotoPreview: PhotosResetable {
+    var photos: [ZLPhotoModel] {
+        get {
+            return arrSelectedModels
+        }
+        
+        set {
+            self.reset(photos: newValue)
+        }
+    }
+    
     func reset(photos: [ZLPhotoModel]) {
         self.arrSelectedModels = photos
         if let first = photos.first {
             self.currentShowModel = first
         }
         self.collectionView.reloadData()
+        self.collectionView.contentOffset = .zero
+    }
+    
+    func refreshSelection() {
+        self.reconfigureVisiableCells()
     }
 }
 
@@ -2284,11 +2338,26 @@ extension ZLImageNavController: ZLImageNavControllerProtocol {
 }
 
 extension ZLImageNavController: PhotosResetable {
-    func reset(photos: [ZLPhotoModel]) {
-        guard let topVC = topViewController as? PhotosResetable else {
-            return
+    var photos: [ZLPhotoModel] {
+        get {
+            return resetableTopVC?.photos ?? []
         }
-        topVC.reset(photos: photos)
+        
+        set {
+            self.reset(photos: newValue)
+        }
+    }
+    
+    func reset(photos: [ZLPhotoModel]) {
+        resetableTopVC?.photos = photos
+    }
+    
+    func refreshSelection() {
+        resetableTopVC?.refreshSelection()
+    }
+    
+    var resetableTopVC: PhotosResetable? {
+        return topViewController as? PhotosResetable
     }
 }
 
