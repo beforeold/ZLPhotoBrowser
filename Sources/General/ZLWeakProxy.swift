@@ -114,8 +114,8 @@ fileprivate struct LayoutContext {
     let context: [String: Any]?
     
     let assetInset: CGFloat
-    let assetWidth: CGFloat
-    let assetHeight: CGFloat
+    let assetWidth: CGFloat?
+    let assetHeight: CGFloat?
     let thumbnailLength: CGFloat
     let thumbnailContainerHeight: CGFloat
     let thumbnailSpacing: CGFloat
@@ -126,8 +126,8 @@ fileprivate struct LayoutContext {
         self.context = context
         
         self.assetInset = (context?["assetInset"] as? CGFloat) ?? 0
-        self.assetWidth = (context?["assetWidth"] as? CGFloat) ?? 0
-        self.assetHeight = (context?["assetHeight"] as? CGFloat) ?? 0
+        self.assetWidth = (context?["assetWidth"] as? CGFloat)
+        self.assetHeight = (context?["assetHeight"] as? CGFloat)
         self.thumbnailLength = (context?["thumbnailLength"] as? CGFloat) ?? 40
         self.thumbnailContainerHeight = (context?["thumbnailContainerHeight"] as? CGFloat) ?? 80
         self.thumbnailSpacing = (context?["thumbnailSpacing"] as? CGFloat) ?? 8
@@ -393,7 +393,8 @@ class PhotoPreviewController: UIViewController {
     
     private var hasAppear = true
     
-    private var hideNavView = false
+    /// is hidding nav view
+    private var isHiddingNavView = false
     
     private var popInteractiveTransition: PhotoPreviewPopInteractiveTransition?
     
@@ -848,7 +849,7 @@ class PhotoPreviewController: UIViewController {
         popInteractiveTransition?.fromFrameProvider = fromFrameProvider
         popInteractiveTransition?.shouldStartTransition = { [weak self] point -> Bool in
             guard let `self` = self else { return false }
-            if !self.hideNavView, self.navView.frame.contains(point) || self.bottomView.frame.contains(point) {
+            if !self.isHiddingNavView, self.navView.frame.contains(point) || self.bottomView.frame.contains(point) {
                 return false
             }
             
@@ -878,7 +879,7 @@ class PhotoPreviewController: UIViewController {
         popInteractiveTransition?.cancelTransition = { [weak self] in
             guard let `self` = self else { return }
             
-            self.hideNavView = false
+            self.isHiddingNavView = false
             self.navView.isHidden = false
             self.bottomView.isHidden = false
             UIView.animate(withDuration: 0.5) {
@@ -1326,19 +1327,20 @@ class PhotoPreviewController: UIViewController {
             return
         }
         
-        hideNavView.toggle()
+        isHiddingNavView.toggle()
         
         let currentCell = collectionView.cellForItem(at: IndexPath(row: currentIndex, section: 0))
         if let cell = currentCell as? ZLVideoPreviewCell {
             if cell.isPlaying {
-                hideNavView = true
+                isHiddingNavView = true
             }
         }
         
         // always show navViews
+        // return here
         /*
-        navView.isHidden = hideNavView
-        bottomView.isHidden = showBottomViewAndSelectBtn ? hideNavView : true
+        navView.isHidden = isHiddingNavView
+        bottomView.isHidden = showBottomViewAndSelectBtn ? isHiddingNavView : true
         */
     }
     
@@ -1638,7 +1640,7 @@ extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDe
     }
     
     func getItemWidth() -> CGFloat {
-        if let assetWidth = context?["assetWidth"] as? CGFloat {
+        if let assetWidth = self.layoutContext.assetWidth {
             return assetWidth
         }
         
@@ -1646,7 +1648,7 @@ extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDe
     }
     
     func getItemHeight() -> CGFloat {
-        if let assetHeight = context?["assetHeight"] as? CGFloat {
+        if let assetHeight = self.layoutContext.assetHeight {
             return assetHeight
         }
         
@@ -1768,7 +1770,8 @@ class SelectedPhotoPreview: UIView, UICollectionViewDataSource, UICollectionView
         let minimumSpacing = self.layoutContext.thumbnailSpacing
  
         let itemLength = self.layoutContext.thumbnailLength
-        let forCenterInset = 0.5 * (UIScreen.main.bounds.width - itemLength)
+        let assetInset = self.layoutContext.assetInset
+        let forCenterInset = 0.5 * (UIScreen.main.bounds.width - itemLength - 2 * assetInset)
         
         let layout = UICollectionViewFlowLayout()
         layout.itemSize = CGSize(width: itemLength, height: itemLength)
