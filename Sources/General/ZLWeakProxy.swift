@@ -142,6 +142,10 @@ public protocol PhotosResetable: AnyObject {
     func refreshSelection()
 }
 
+public protocol SelectedViewProviding {
+    var selectedViews: [UIView] { get }
+}
+
 public protocol AppTracking {
     
     /// track event
@@ -1409,6 +1413,12 @@ class PhotoPreviewController: UIViewController {
     
 }
 
+extension PhotoPreviewController: SelectedViewProviding {
+    var selectedViews: [UIView] {
+        return self.selPhotoPreview?.selectedViews ?? []
+    }
+}
+
 extension PhotoPreviewController: PhotosResetable {
     var photos: [ZLPhotoModel] {
         get {
@@ -2155,6 +2165,27 @@ class SelectedPhotoPreview: UIView, UICollectionViewDataSource, UICollectionView
     }
 }
 
+extension SelectedPhotoPreview: SelectedViewProviding {
+    var selectedViews: [UIView] {
+        let selectedCells: [UIView] = collectionView.indexPathsForVisibleItems
+            .sorted {
+                $0.item < $1.item
+            }
+            .compactMap { indexPath in
+                guard let cell = collectionView.cellForItem(at: indexPath) as? ZLPhotoPreviewSelectedViewCell else {
+                    return nil
+                }
+                guard cell.model.isSelected else {
+                    return nil
+                }
+                
+                return cell
+            }
+        
+        return selectedCells
+    }
+}
+
 extension SelectedPhotoPreview: PhotosResetable {
     var photos: [ZLPhotoModel] {
         get {
@@ -2276,6 +2307,12 @@ class PhotoPreviewSelectedViewCell: UICollectionViewCell {
     @available(*, unavailable)
     required init?(coder _: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+    
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        
+        self.isHidden = false
     }
     
     override func layoutSubviews() {
