@@ -2623,7 +2623,7 @@ class ZLSpacingButton: UIButton {
 
 
 extension String {
-    var localized: String {
+    fileprivate var stringWithKey: String {
         return NSLocalizedString(self, comment: "")
     }
 }
@@ -2642,11 +2642,11 @@ struct PhotoInfo {
     static let placeholder: PhotoInfo = .init(
         name: "--",
         itemList: [
-            .init(key: "dimension".localized, value: "--"),
-            .init(key: "size".localized, value: "--"),
-            .init(key: "date".localized, value: "--"),
-            .init(key: "album".localized, value: "--"),
-            .init(key: "phone".localized, value: "--"),
+            .init(key: "dimension".stringWithKey, value: "--"),
+            .init(key: "size".stringWithKey, value: "--"),
+            .init(key: "date".stringWithKey, value: "--"),
+            .init(key: "album".stringWithKey, value: "--"),
+            .init(key: "phone".stringWithKey, value: "--"),
         ]
     )
 }
@@ -2769,10 +2769,15 @@ class PhotoInfoViewModel: ObservableObject {
             return recentAddTitle
         }
         
-        return "unknown".localized
+        return "unknown".stringWithKey
     }
     
     private func loadInfo(asset: PHAsset) {
+        // ignore the invalid asset created by `PHAsset()`
+        if asset.localIdentifier.contains("null") {
+            return
+        }
+        
         let manager = PHImageManager.default()
         let requestOptions = PHImageRequestOptions()
         requestOptions.isSynchronous = false
@@ -2782,7 +2787,7 @@ class PhotoInfoViewModel: ObservableObject {
         manager.requestImageDataAndOrientation(for: asset, options: requestOptions) { (data, fileType, orientation, info) in
             DispatchQueue.global().async {
                 var itemList: [PhotoInfo.Item] = []
-                itemList.append(.init(key: "dimension".localized, value: "\(asset.pixelWidth) x \(asset.pixelHeight)"))
+                itemList.append(.init(key: "dimension".stringWithKey, value: "\(asset.pixelWidth) x \(asset.pixelHeight)"))
                 
                 let (size, fileName) = PhotoPreviewController.fileSize(asset: asset)
                 
@@ -2790,11 +2795,11 @@ class PhotoInfoViewModel: ObservableObject {
                 formatter.countStyle = .decimal
                 formatter.allowedUnits = [.useMB, .useKB]
                 let sizeString = formatter.string(fromByteCount: size)
-                itemList.append(.init(key: "size".localized, value: sizeString))
+                itemList.append(.init(key: "size".stringWithKey, value: sizeString))
 
                 let date = asset.creationDate ?? Date()
-                let dateString = formatDate(date) ?? "unknown".localized
-                itemList.append(.init(key: "date".localized, value: dateString))
+                let dateString = formatDate(date) ?? "unknown".stringWithKey
+                itemList.append(.init(key: "date".stringWithKey, value: dateString))
                 
                 let phoneString: String
                 if let data = data,
@@ -2803,7 +2808,7 @@ class PhotoInfoViewModel: ObservableObject {
                    let model = tiff["Model"] as? String {
                     phoneString = model
                 }  else {
-                    phoneString = "unknown".localized
+                    phoneString = "unknown".stringWithKey
                 }
                 
                 DispatchQueue.main.async {
@@ -2816,12 +2821,12 @@ class PhotoInfoViewModel: ObservableObject {
                     }
                     
                     let albumString = firstAlbum?.title ?? self.otherPossibleAlbumTitle(asset: asset)
-                    itemList.append(.init(key: "album".localized, value: albumString))
+                    itemList.append(.init(key: "album".stringWithKey, value: albumString))
                     
-                    itemList.append(.init(key: "phone".localized, value: phoneString))
+                    itemList.append(.init(key: "phone".stringWithKey, value: phoneString))
                     
                     let nameComponents = fileName.map { $0.components(separatedBy: ".") } ?? []
-                    let nameString = nameComponents.first ?? "unknown".localized
+                    let nameString = nameComponents.first ?? "unknown".stringWithKey
                     
                     let info = PhotoInfo(name: nameString, itemList: itemList)
                     self.info = info
