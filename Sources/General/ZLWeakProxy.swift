@@ -78,7 +78,7 @@ public struct PhotoPreview {
         removingItemCallback: ((_ reason: String, _ model: ZLPhotoModel) -> Void)? = nil,
         removingAllCallback: (() -> Void)? = nil
     ) -> PreviewVC {
-        PhotoInfoViewModel.shared.prepare()
+        PhotoInfoViewModel.shared.prepare(context: context)
         
         let models: [ZLPhotoModel]
         if photos.isEmpty {
@@ -799,14 +799,18 @@ class PhotoPreviewController: UIViewController {
 
         NSLayoutConstraint.activate(constraints)
         
-        setupInfoView()
+        setupPhotoInfoView()
         
         setupTopRightIndexView()
         
         view.bringSubviewToFront(navView)
     }
     
-    private func setupInfoView() {
+    private func setupPhotoInfoView() {
+        if let ignoresPhotoInfo = context?["ignoresPhotoInfo"] as? Bool, ignoresPhotoInfo {
+            return
+        }
+        
         let rootView = PhotoInfoView(viewModel: .shared)
         infoVC = UIHostingController(rootView: rootView)
         view.addSubview(infoVC.view)
@@ -2651,7 +2655,11 @@ class PhotoInfoViewModel: ObservableObject {
         
     }
     
-    func prepare() {
+    func prepare(context: [String: Any]?) {
+        if let ignoresPhotoInfo = context?["ignoresPhotoInfo"] as? Bool, ignoresPhotoInfo {
+            return
+        }
+        
         update(isDisplaying: false)
         
         if albumList != nil {
