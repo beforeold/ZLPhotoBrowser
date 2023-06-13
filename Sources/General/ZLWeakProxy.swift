@@ -1751,16 +1751,7 @@ extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDe
             }
             
             if disablesScaleBehavior {
-                cell.preview.scrollView.isScrollEnabled = false
-                cell.preview.scrollView.pinchGestureRecognizer?.isEnabled = false
-                
-                let doubleTapItems = cell.preview.gestureRecognizers?.filter { tap in
-                    guard let tap = tap as? UITapGestureRecognizer, tap.numberOfTapsRequired == 2 else {
-                        return false
-                    }
-                    return true
-                }
-                doubleTapItems?.first?.isEnabled = false
+                cell.preview.disablesScaleBehavior = true
             }
             
             cell.singleTapBlock = { [weak self] in
@@ -1794,8 +1785,19 @@ extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDe
 }
 
 
-extension Int {
-    var px: CGFloat {
+fileprivate struct HapticFeedback {
+  /// selection change
+  ///
+  /// @note haptic feedback might not work on old devices
+  static func selectionChanged() {
+    let feedback = UISelectionFeedbackGenerator()
+    feedback.prepare()
+    feedback.selectionChanged()
+  }
+}
+
+fileprivate extension Int {
+    var actualPixel: CGFloat {
         return CGFloat(self) * UIScreen.main.bounds.width / 375
     }
 }
@@ -2125,8 +2127,8 @@ class SelectedPhotoPreview: UIView, UICollectionViewDataSource, UICollectionView
         scrollPositionBlock(model)
         
         if currentShowModel != model {
+            HapticFeedback.selectionChanged()
             currentShowModel = model
-            self.collectionView.reloadItems(at: self.collectionView.indexPathsForVisibleItems)
         }
     }
     

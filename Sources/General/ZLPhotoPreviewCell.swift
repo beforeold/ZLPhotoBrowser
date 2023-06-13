@@ -872,6 +872,8 @@ class ZLPreviewView: UIView {
             imageView.image = newValue
         }
     }
+  
+    var disablesScaleBehavior: Bool = false
     
     var singleTapBlock: (() -> Void)?
     
@@ -940,6 +942,7 @@ class ZLPreviewView: UIView {
             PHImageManager.default().cancelImageRequest(gifImageRequestID)
         }
         
+        imageView.image = nil
         scrollView.zoomScale = 1
         imageIdentifier = model.ident
         
@@ -965,6 +968,7 @@ class ZLPreviewView: UIView {
             imageView.image = editImage
             resetSubViewSize()
         } else {
+            let requestingIdentifier = model.asset.localIdentifier
             imageRequestID = ZLPhotoManager.fetchImage(for: model.asset, size: requestPhotoSize(gif: false), progress: { [weak self] progress, _, _, _ in
                 self?.progressView.progress = progress
                 if progress >= 1 {
@@ -973,7 +977,7 @@ class ZLPreviewView: UIView {
                     self?.progressView.isHidden = false
                 }
             }, completion: { [weak self] image, isDegraded in
-                guard self?.imageIdentifier == self?.model.ident else {
+                guard requestingIdentifier == self?.model.ident else {
                     return
                 }
                 self?.imageView.image = image
@@ -1164,6 +1168,9 @@ class ZLPreviewView: UIView {
 extension ZLPreviewView: UIScrollViewDelegate {
     
     func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+        if disablesScaleBehavior {
+            return nil
+        }
         return containerView
     }
     
