@@ -2105,6 +2105,7 @@ class SelectedPhotoPreview: UIView, UICollectionViewDataSource, UICollectionView
         
         cells.forEach { cell in
             cell.checkmarkImageView.isHidden = !cell.model.isSelected
+            cell.isHidden = false
         }
     }
     
