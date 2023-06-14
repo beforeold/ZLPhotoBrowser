@@ -1860,6 +1860,8 @@ class SelectedPhotoPreview: UIView, UICollectionViewDataSource, UICollectionView
     
     private var currentShowModel: ZLPhotoModel
     
+    private var focusHudView: UIView!
+  
     private var isDraging = false
     
     var ignoresDidScroll = false
@@ -1918,6 +1920,7 @@ class SelectedPhotoPreview: UIView, UICollectionViewDataSource, UICollectionView
             view.centerXAnchor.constraint(equalTo: collectionView.centerXAnchor),
             view.centerYAnchor.constraint(equalTo: collectionView.centerYAnchor),
         ])
+        focusHudView = view
     }
     
     @available(*, unavailable)
@@ -2085,7 +2088,8 @@ class SelectedPhotoPreview: UIView, UICollectionViewDataSource, UICollectionView
         cell.checkmarkImageView.image = selectedImage
         cell.checkmarkImageView.isHidden = !isSelected
         cell.cornerPadding = self.layoutContext.thumbnailCornerPadding
-        
+        cell.isHidden = false
+      
         return cell
     }
     
@@ -2184,6 +2188,12 @@ extension SelectedPhotoPreview: SelectedViewProviding {
                 return cell
             }
         
+        if self.currentShowModel.isSelected {
+            UIView.animate(withDuration: 0.25) {
+                self.focusHudView.alpha = 0
+            }
+        }
+      
         return selectedCells
     }
 }
@@ -2204,6 +2214,7 @@ extension SelectedPhotoPreview: PhotosResetable {
         if let first = photos.first {
             self.currentShowModel = first
         }
+        self.focusHudView.alpha = 1.0
         self.collectionView.reloadData()
         self.collectionView.contentOffset = .zero
     }
