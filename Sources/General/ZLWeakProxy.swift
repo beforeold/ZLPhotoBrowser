@@ -787,6 +787,7 @@ class PhotoPreviewController: UIViewController {
             visualEffectView.layer.cornerRadius = keepButton.layer.cornerRadius
             visualEffectView.layer.masksToBounds = true
             self.view.insertSubview(visualEffectView, belowSubview: keepButton)
+            visualEffectView.isHidden = (removingReason != "keep")
             
             // same layout with keepButton
             visualEffectView.translatesAutoresizingMaskIntoConstraints = false
