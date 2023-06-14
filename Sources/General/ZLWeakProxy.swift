@@ -201,7 +201,16 @@ class PhotoPreviewController: UIViewController {
     var removingReason: String?
     var removingItemCallback: ((_ reason: String, _ model: ZLPhotoModel) -> Void)?
     var removingAllCallback: (() -> Void)?
+    
     private var infoVC: UIViewController!
+    
+    private let showBottomViewAndSelectBtn: Bool
+    
+    private var indexBeforOrientationChanged: Int
+    
+    private var ignoresDidScroll = false
+    
+    var isMenuContextPreview = false
     
     var currentIndex: Int {
         didSet {
@@ -210,18 +219,6 @@ class PhotoPreviewController: UIViewController {
 #endif
            popInteractiveTransition?.currentIndex = currentIndex
         }
-    }
-    
-    class MyView: UIView {
-        override var frame: CGRect {
-            didSet {
-                print("setframe myview")
-            }
-        }
-    }
-    
-    override func loadView() {
-        self.view = MyView(frame: UIScreen.main.bounds)
     }
     
     lazy var collectionView: UICollectionView = {
@@ -243,13 +240,7 @@ class PhotoPreviewController: UIViewController {
         
         return view
     }()
-    
-    private let showBottomViewAndSelectBtn: Bool
-    
-    private var indexBeforOrientationChanged: Int
-    
-    private var ignoresDidScroll = false
-    
+
     private lazy var navView: UIView = {
         let view = UIView()
         view.backgroundColor = .zl.navBarColorOfPreviewVC
@@ -306,12 +297,17 @@ class PhotoPreviewController: UIViewController {
         button.contentEdgeInsets = .init(top: 4, left: 8, bottom: 4, right: 8)
         button.isUserInteractionEnabled = false
         button.layer.cornerRadius = 11
-        button.backgroundColor = UIColor.black.withAlphaComponent(0.2)
+        button.layer.masksToBounds = true
+        
+        // use blur effect instead of alpha backgroundColor
+        let blurEffect = UIBlurEffect(style: .systemUltraThinMaterial)
+        let visualEffectView = UIVisualEffectView(effect: blurEffect)
+        visualEffectView.frame = button.bounds
+        visualEffectView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        button.insertSubview(visualEffectView, at: 0)
         
         return button
     }()
-    
-    var isMenuContextPreview = false
     
     private lazy var bottomView: UIView = {
         let view = UIView()
@@ -329,12 +325,19 @@ class PhotoPreviewController: UIViewController {
         let button = ZLSpacingButton(type: .custom)
         button.titleEdgeInsets = . init(top: 0, left: 8, bottom: 0, right: 0)
         button.contentEdgeInsets = .init(top: 4, left: 8, bottom: 4, right: 12)
-        button.backgroundColor = UIColor(white: 1.0, alpha: 0.2)
         button.layer.cornerRadius = 15
+        button.layer.masksToBounds = true
         button.titleLabel?.font = sfProFont(13)
         button.addTarget(self, action: #selector(onKeepButtonEvent), for: .touchUpInside)
         button.setTitle(title, for: .normal)
         button.setImage(image, for: .normal)
+        
+        // use blur effect instead of alpha backgroundColor
+        let blurEffect = UIBlurEffect(style: .systemUltraThinMaterial)
+        let visualEffectView = UIVisualEffectView(effect: blurEffect)
+        visualEffectView.frame = button.bounds
+        visualEffectView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        button.insertSubview(visualEffectView, at: 0)
         
         return button
     }()
@@ -343,11 +346,19 @@ class PhotoPreviewController: UIViewController {
         let button = ZLSpacingButton(type: .custom)
         button.titleEdgeInsets = . init(top: 0, left: 8, bottom: 0, right: 0)
         button.contentEdgeInsets = .init(top: 4, left: 8, bottom: 4, right: 12)
-        button.backgroundColor = UIColor(white: 1.0, alpha: 0.2)
         button.layer.cornerRadius = 15
+        button.layer.masksToBounds = true
         button.titleLabel?.font = sfProFont(13)
         button.addTarget(self, action: #selector(onSaveButtonEvent), for: .touchUpInside)
         button.setTitle("save badcase", for: .normal)
+        
+        // use blur effect instead of alpha backgroundColor
+        let blurEffect = UIBlurEffect(style: .systemUltraThinMaterial)
+        let visualEffectView = UIVisualEffectView(effect: blurEffect)
+        visualEffectView.frame = button.bounds
+        visualEffectView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        button.insertSubview(visualEffectView, at: 0)
+        
         return button
     }()
     
