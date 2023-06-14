@@ -304,6 +304,7 @@ class PhotoPreviewController: UIViewController {
         let visualEffectView = UIVisualEffectView(effect: blurEffect)
         visualEffectView.frame = button.bounds
         visualEffectView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        visualEffectView.isUserInteractionEnabled = false
         button.insertSubview(visualEffectView, at: 0)
         
         return button
@@ -332,13 +333,6 @@ class PhotoPreviewController: UIViewController {
         button.setTitle(title, for: .normal)
         button.setImage(image, for: .normal)
         
-        // use blur effect instead of alpha backgroundColor
-        let blurEffect = UIBlurEffect(style: .systemUltraThinMaterial)
-        let visualEffectView = UIVisualEffectView(effect: blurEffect)
-        visualEffectView.frame = button.bounds
-        visualEffectView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        button.insertSubview(visualEffectView, at: 0)
-        
         return button
     }()
     
@@ -357,6 +351,7 @@ class PhotoPreviewController: UIViewController {
         let visualEffectView = UIVisualEffectView(effect: blurEffect)
         visualEffectView.frame = button.bounds
         visualEffectView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        visualEffectView.isUserInteractionEnabled = false
         button.insertSubview(visualEffectView, at: 0)
         
         return button
@@ -772,14 +767,36 @@ class PhotoPreviewController: UIViewController {
         bottomView.addSubview(doneBtn)
         
         // - overlay
-        view.addSubview(keepButton)
-        keepButton.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            keepButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
-            keepButton.bottomAnchor.constraint(equalTo: bottomView.topAnchor, constant: -20),
-            keepButton.heightAnchor.constraint(equalToConstant: 2 * 15),
-        ])
-        keepButton.isHidden = (removingReason != "keep")
+        do {
+            let button = keepButton
+            view.addSubview(keepButton)
+            button.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                button.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 24),
+                button.bottomAnchor.constraint(equalTo: bottomView.topAnchor, constant: -20),
+                button.heightAnchor.constraint(equalToConstant: 2 * 15),
+            ])
+            keepButton.isHidden = (removingReason != "keep")
+        }
+        
+        do {
+            // use blur effect instead of alpha backgroundColor
+            let blurEffect = UIBlurEffect(style: .systemUltraThinMaterial)
+            let visualEffectView = UIVisualEffectView(effect: blurEffect)
+            visualEffectView.isUserInteractionEnabled = false
+            visualEffectView.layer.cornerRadius = keepButton.layer.cornerRadius
+            visualEffectView.layer.masksToBounds = true
+            self.view.insertSubview(visualEffectView, belowSubview: keepButton)
+            
+            // same layout with keepButton
+            visualEffectView.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                visualEffectView.leadingAnchor.constraint(equalTo: keepButton.leadingAnchor),
+                visualEffectView.trailingAnchor.constraint(equalTo: keepButton.trailingAnchor),
+                visualEffectView.topAnchor.constraint(equalTo: keepButton.topAnchor),
+                visualEffectView.bottomAnchor.constraint(equalTo: keepButton.bottomAnchor),
+            ])
+        }
         
         let settings: UserDefaults? = .init(suiteName: "bubble_settings")
         let show = (settings?.bool(forKey: "settings.qa.showsTestSettings")) ?? false
