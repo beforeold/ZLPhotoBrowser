@@ -2094,6 +2094,11 @@ class SelectedPhotoPreview: UIView, UICollectionViewDataSource, UICollectionView
     }
     
     func reconfigureVisiableCells() {
+        if collectionView.visibleCells.isEmpty {
+            collectionView.reloadData()
+            return
+        }
+        
         let cells = collectionView.visibleCells.compactMap { cell in
             return cell as? ZLPhotoPreviewSelectedViewCell
         }
@@ -2220,6 +2225,7 @@ extension SelectedPhotoPreview: PhotosResetable {
     }
     
     func refreshSelection() {
+        self.focusHudView.alpha = 1.0
         self.reconfigureVisiableCells()
     }
 }
