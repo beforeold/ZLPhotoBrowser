@@ -284,6 +284,7 @@ public class ZLPhotoManager: NSObject {
     private class func fetchImage(for asset: PHAsset, size: CGSize, resizeMode: PHImageRequestOptionsResizeMode, progress: ((CGFloat, Error?, UnsafeMutablePointer<ObjCBool>, [AnyHashable: Any]?) -> Void)? = nil, completion: @escaping (UIImage?, Bool) -> Void) -> PHImageRequestID {
         let option = PHImageRequestOptions()
         option.resizeMode = resizeMode
+        option.deliveryMode = .opportunistic
         option.isNetworkAccessAllowed = true
         option.progressHandler = { pro, error, stop, info in
             ZLMainAsync {
