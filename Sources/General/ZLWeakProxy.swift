@@ -772,7 +772,7 @@ class PhotoPreviewController: UIViewController {
             view.addSubview(keepButton)
             button.translatesAutoresizingMaskIntoConstraints = false
             NSLayoutConstraint.activate([
-                button.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 24),
+                button.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
                 button.bottomAnchor.constraint(equalTo: bottomView.topAnchor, constant: -20),
                 button.heightAnchor.constraint(equalToConstant: 2 * 15),
             ])
