@@ -18,8 +18,53 @@ class TestCustomPreviewViewController: UIViewController {
     
     showCustomView()
     
-    let fullItem = UIBarButtonItem(title: "Show Full Screen", style: .plain, target: self, action: #selector(onCreatePhotosPreview))
+    let fullItem = UIBarButtonItem(title: "Full", style: .plain, target: self, action: #selector(onCreatePhotosPreview))
     navigationItem.rightBarButtonItem = fullItem
+      
+    let singleItem = UIBarButtonItem(title: "One", style: .plain, target: self, action: #selector(onPreviewOneEvent))
+    navigationItem.rightBarButtonItems = [fullItem, singleItem]
+  }
+  
+  @objc func onPreviewOneEvent() {
+    let options = PHFetchOptions()
+    options.predicate = NSPredicate(format: "mediaType == %ld", PHAssetMediaType.image.rawValue)
+    options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+    let result = PHAsset.fetchAssets(with: options)
+    var assets: [ZLPhotoModel] = []
+    
+    let limit = 1
+    var loopCount = 0
+    result.enumerateObjects(options: []) { asset, index, stop in
+        loopCount += 1
+        if loopCount > limit {
+            stop.pointee = true
+            return
+        }
+        
+        let photo = ZLPhotoModel(asset: asset)
+        photo.isSelected = index % 2 == 0
+        assets.append(photo)
+    }
+    
+    // let index = (0..<limit).randomElement()!
+    let index = 0
+    let vc = PhotoPreview.createPhotoPreviewVC(
+        photos: assets,
+        index: index,
+        embedsInNavigationController: true,
+        context: [
+          "previewOne": true,
+          "showBottomViewAndSelectBtn": false,
+        ],
+        removingReason: nil) { selectingModel in
+            print("selectingModel", selectingModel)
+        } removingItemCallback: { reason, model in
+            print("removingCallback", reason, model)
+        } removingAllCallback: { [weak self] in
+            print("removingAllCallback")
+            self?.dismiss(animated: true)
+        }
+    show(vc, sender: nil)
   }
   
   @objc func onCreatePhotosPreview() {

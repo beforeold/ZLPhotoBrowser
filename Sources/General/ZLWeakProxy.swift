@@ -89,9 +89,12 @@ public struct PhotoPreview {
             models = photos
         }
         
+        let showBottomViewAndSelectBtn = (context?["showBottomViewAndSelectBtn"] as? Bool) ?? true
+        
         let vc = PhotoPreviewController(
             photos: models,
-            index: index
+            index: index,
+            showBottomViewAndSelectBtn: showBottomViewAndSelectBtn
         )
         vc.isMenuContextPreview = isMenuContextPreview
         vc.selectionEventCallback = selectionEventCallback
@@ -121,6 +124,7 @@ fileprivate struct LayoutContext {
     let thumbnailSpacing: CGFloat
     let thumbnailCornerRadius: CGFloat
     let thumbnailCornerPadding: CGFloat
+    let previewOne: Bool
     
     init(context: [String: Any]?) {
         self.context = context
@@ -133,6 +137,7 @@ fileprivate struct LayoutContext {
         self.thumbnailSpacing = (context?["thumbnailSpacing"] as? CGFloat) ?? 8
         self.thumbnailCornerRadius = (context?["thumbnailCornerRadius"] as? CGFloat) ?? 0
         self.thumbnailCornerPadding = (context?["thumbnailCornerPadding"] as? CGFloat) ?? 2
+        self.previewOne = (context?["previewOne"] as? Bool) ?? false
     }
     
 }
@@ -543,7 +548,7 @@ class PhotoPreviewController: UIViewController {
             height: getItemHeight()
         )
       
-        if isMenuContextPreview {
+        if isFullSizeCollectionView {
           collectionView.frame = view.bounds
         }
         
@@ -929,23 +934,39 @@ class PhotoPreviewController: UIViewController {
         popInteractiveTransition?.cancelTransition = { [weak self] in
             guard let `self` = self else { return }
             
-            self.isHiddingNavView = false
-            self.navView.isHidden = false
-            self.bottomView.isHidden = false
-            UIView.animate(withDuration: 0.5) {
-                self.navView.alpha = 1
-                self.bottomView.alpha = 1
-            }
-            
-            guard let cell = self.collectionView.cellForItem(at: IndexPath(row: self.currentIndex, section: 0)) else {
-                return
-            }
-            if cell is ZLGifPreviewCell {
-                (cell as! ZLGifPreviewCell).resumeGif()
-            }
+            self.recoverNavView()
+            self.recoverBottomView()
+            self.recoverGif()
+        }
+    }
+  
+    private func recoverNavView() {
+        self.isHiddingNavView = false
+        self.navView.isHidden = false
+        UIView.animate(withDuration: 0.5) {
+            self.navView.alpha = 1
         }
     }
     
+    private func recoverBottomView() {
+        guard showBottomViewAndSelectBtn else { return }
+      
+        self.bottomView.isHidden = false
+        UIView.animate(withDuration: 0.5) {
+            self.bottomView.alpha = 1
+        }
+    }
+  
+    private func recoverGif() {
+        guard let cell = self.collectionView.cellForItem(at: IndexPath(row: self.currentIndex, section: 0)) else {
+          return
+        }
+        
+        if cell is ZLGifPreviewCell {
+            (cell as! ZLGifPreviewCell).resumeGif()
+        }
+    }
+  
     /// reset subview status including:
     /// navView, selectBtn, indexLabel, titleIndexLabel
     /// buttomView, editBtn, originalBtn, doneBtn
@@ -954,10 +975,6 @@ class PhotoPreviewController: UIViewController {
             return
         }
         
-        guard let nav = navigationController as? ZLImageNavControllerProtocol else {
-            zlLoggerInDebug("Navigation controller is null")
-            return
-        }
         let config = ZLPhotoConfiguration.default()
         let currentModel = arrDataSources[currentIndex]
         
@@ -973,11 +990,38 @@ class PhotoPreviewController: UIViewController {
         titleIndexLabel.text = indexText
         topRightIndexView.setTitle(indexText, for: .normal)
         
+        
+        if hidesNavView {
+            navView.isHidden = true
+        }
+        
+        if hidesInfoButton {
+            infoButton.isHidden = true
+        }
+        
+        if hidesTitleIndexLabel {
+            titleIndexLabel.isHidden = true
+        }
+        
+        resetSelectionInfo()
+    }
+    
+    private func resetSelectionInfo() {
+        guard let nav = navigationController as? ZLImageNavControllerProtocol else {
+            zlLoggerInDebug("Navigation controller is null")
+            return
+        }
+        
         guard showBottomViewAndSelectBtn else {
             selectBtn.isHidden = true
             bottomView.isHidden = true
             return
         }
+        
+        let config = ZLPhotoConfiguration.default()
+        let currentModel = arrDataSources[currentIndex]
+        
+        // the following logic are about the bottom bar
         let selCount = nav.arrSelectedModels.count
         var doneTitle = localLanguageTextValue(.done)
         if ZLPhotoConfiguration.default().showSelectCountOnDoneBtn, selCount > 0 {
@@ -1008,16 +1052,31 @@ class PhotoPreviewController: UIViewController {
            ZLPhotoConfiguration.default().allowSelectImage {
             originalBtn.isHidden = !((currentModel.type == .image) || (currentModel.type == .livePhoto && !config.allowSelectLivePhoto) || (currentModel.type == .gif && !config.allowSelectGif))
         }
-      
+    }
+    
+    private var hidesNavView: Bool {
         if isMenuContextPreview {
-            navView.isHidden = true
-            bottomView.isHidden = true
+            return true
         }
         
         let hidesNavView = (context?["hidesNavView"] as? Bool) ?? false
         if hidesNavView {
-            navView.isHidden = true
+            return true
         }
+        
+        return false
+    }
+    
+    private var hidesTitleIndexLabel: Bool {
+        return layoutContext.previewOne
+    }
+    
+    private var isFullSizeCollectionView: Bool {
+        return isMenuContextPreview || layoutContext.previewOne
+    }
+    
+    private var hidesInfoButton: Bool {
+        return layoutContext.previewOne
     }
     
     private func resetIndexLabelStatus() {
@@ -1701,7 +1760,7 @@ extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDe
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
         var inset = ZLPhotoPreviewController.colItemSpacing / 2
-        if isMenuContextPreview {
+        if isFullSizeCollectionView {
             inset = 0
         }
         return UIEdgeInsets(top: 0, left: inset, bottom: 0, right: inset)
@@ -1724,7 +1783,7 @@ extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDe
             return assetHeight
         }
         
-        if isMenuContextPreview {
+        if isFullSizeCollectionView {
           return view.bounds.height
         }
       
