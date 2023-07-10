@@ -1803,6 +1803,15 @@ extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDe
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let config = ZLPhotoConfiguration.default()
         let model = arrDataSources[indexPath.row]
+      
+        if let assetWidth = layoutContext.assetWidth, let assetHeight = layoutContext.assetHeight {
+            let scale = UIScreen.main.scale
+            let presetPreviewSize = CGSize(width: assetWidth * scale, height: assetHeight * scale)
+            model.presetPreviewSize = presetPreviewSize
+        } else {
+            model.presetPreviewSize = nil
+        }
+
         
         let baseCell: ZLPreviewBaseCell
         
