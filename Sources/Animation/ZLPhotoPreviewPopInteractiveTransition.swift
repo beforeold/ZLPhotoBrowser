@@ -84,7 +84,7 @@ class ZLPhotoPreviewPopInteractiveTransition: UIPercentDrivenInteractiveTransiti
             
             let vel = pan.velocity(in: viewController?.view)
             let p = pan.translation(in: viewController?.view)
-            let percent: CGFloat = max(0.0, p.y / (viewController?.view.bounds.height ?? UIScreen.main.bounds.height))
+            let percent: CGFloat = max(0.0, p.y / (viewController?.view.bounds.height ?? ZLScreen.main.bounds.height))
             
             let dismiss = vel.y > 300 || (percent > 0.1 && vel.y > -300)
             
@@ -105,7 +105,7 @@ class ZLPhotoPreviewPopInteractiveTransition: UIPercentDrivenInteractiveTransiti
         let currentTouch = pan.location(in: viewController?.view)
         
         // 由下拉的偏移值决定缩放比例，越往下偏移，缩得越小。scale值区间[0.3, 1.0]
-        let scale = min(1.0, max(0.3, 1 - translation.y / UIScreen.main.bounds.height))
+        let scale = min(1.0, max(0.3, 1 - translation.y / ZLScreen.main.bounds.height))
         
         let width = imageViewOriginalFrame.size.width * scale
         let height = imageViewOriginalFrame.size.height * scale

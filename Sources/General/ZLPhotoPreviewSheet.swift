@@ -34,7 +34,7 @@ public class ZLPhotoPreviewSheet: UIView {
         
         static let btnH: CGFloat = 45
         
-        static let spacing: CGFloat = 1 / UIScreen.main.scale
+        static let spacing: CGFloat = 1 / ZLScreen.main.scale
     }
     
     private lazy var baseView: UIView = {
@@ -428,6 +428,7 @@ public class ZLPhotoPreviewSheet: UIView {
     }
     
     @objc private func cameraBtnClick() {
+#if !os(xrOS)
         let config = ZLPhotoConfiguration.default()
         if config.useCustomCamera {
             let camera = ZLCustomCamera()
@@ -459,6 +460,7 @@ public class ZLPhotoPreviewSheet: UIView {
                 showAlertView(String(format: localLanguageTextValue(.noCameraAuthority), getAppName()), sender)
             }
         }
+#endif
     }
     
     @objc private func photoLibraryBtnClick() {

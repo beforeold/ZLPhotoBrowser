@@ -77,7 +77,9 @@ class ZLAdjustSlider: UIView {
     
     lazy var pan = UIPanGestureRecognizer(target: self, action: #selector(panAction(_:)))
     
+    #if !os(xrOS)
     private var impactFeedback: UIImpactFeedbackGenerator?
+    #endif
     
     private var valueForPanBegan: Float = 0
     
@@ -104,11 +106,12 @@ class ZLAdjustSlider: UIView {
         super.init(frame: frame)
         setupUI()
         
+#if !os(xrOS)
         let editConfig = ZLPhotoConfiguration.default().editImageConfiguration
         if editConfig.impactFeedbackWhenAdjustSliderValueIsZero {
             impactFeedback = UIImpactFeedbackGenerator(style: editConfig.impactFeedbackStyle)
         }
-        
+#endif
         addGestureRecognizer(pan)
     }
     
@@ -171,7 +174,9 @@ class ZLAdjustSlider: UIView {
         if pan.state == .began {
             valueForPanBegan = value
             beginAdjust?()
+#if !os(xrOS)
             impactFeedback?.prepare()
+#endif
         } else if pan.state == .changed {
             let transValue = isVertical ? -translation.y : translation.x
             let totalLength = isVertical ? zl.height / 2 : zl.width / 2
@@ -189,7 +194,9 @@ class ZLAdjustSlider: UIView {
             
             guard #available(iOS 10.0, *) else { return }
             if value == 0 {
+#if !os(xrOS)
                 impactFeedback?.impactOccurred()
+#endif
             }
         } else {
             valueForPanBegan = value

@@ -24,6 +24,7 @@
 //  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //  THE SOFTWARE.
 
+#if !os(xrOS)
 import UIKit
 import AVFoundation
 import CoreMotion
@@ -474,7 +475,7 @@ open class ZLCustomCamera: UIViewController, CAAnimationDelegate {
         // 照片输出流
         imageOutput = AVCapturePhotoOutput()
         
-        let preset = ZLPhotoConfiguration.default().cameraConfiguration.sessionPreset.avSessionPreset
+      let preset = ZLPhotoConfiguration.default().cameraConfiguration.sessionPreset.avSessionPreset
         if session.canSetSessionPreset(preset) {
             session.sessionPreset = preset
         } else {
@@ -1132,3 +1133,4 @@ extension ZLCustomCamera: UIGestureRecognizerDelegate {
         return result.count > 0
     }
 }
+#endif

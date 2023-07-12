@@ -311,11 +311,13 @@ public extension ZLPhotoConfiguration {
         return self
     }
     
+#if !os(xrOS)
     @discardableResult
     func cameraConfiguration(_ configuration: ZLCameraConfiguration) -> ZLPhotoConfiguration {
         cameraConfiguration = configuration
         return self
     }
+#endif
     
     @discardableResult
     func canSelectAsset(_ block: ((PHAsset) -> Bool)?) -> ZLPhotoConfiguration {

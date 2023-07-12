@@ -286,9 +286,11 @@ public class ZLPhotoConfiguration: NSObject {
         }
     }
     
+#if !os(xrOS)
     /// The configuration for camera.
     @objc public var cameraConfiguration = ZLCameraConfiguration()
-    
+#endif
+  
     /// This block will be called before selecting an image, the developer can first determine whether the asset is allowed to be selected.
     /// Only control whether it is allowed to be selected, and will not affect the selection logic in the framework.
     /// - Tips: If the choice is not allowed, the developer can toast prompt the user for relevant information.

@@ -54,7 +54,7 @@ class ZLEmbedAlbumListView: UIView {
     
     var hideBlock: (() -> Void)?
     
-    private var orientation: UIInterfaceOrientation = UIApplication.shared.statusBarOrientation
+  private var orientation: UIInterfaceOrientation = ZLScreen.main.statusBarOrientation
     
     init(selectedAlbum: ZLAlbumListModel) {
         self.selectedAlbum = selectedAlbum

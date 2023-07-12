@@ -34,7 +34,7 @@ protocol ZLStickerViewAdditional: NSObject {
 }
 
 struct ZLStickerLayout {
-    static let borderWidth = 1 / UIScreen.main.scale
+    static let borderWidth = 1 / ZLScreen.main.scale
     static let edgeInset: CGFloat = 20
 }
 

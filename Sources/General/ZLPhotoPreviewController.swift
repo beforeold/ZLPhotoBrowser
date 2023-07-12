@@ -294,7 +294,9 @@ class ZLPhotoPreviewController: UIViewController {
     
     private func setupUI() {
         view.backgroundColor = .zl.previewVCBgColor
+      #if !os(xrOS)
         automaticallyAdjustsScrollViewInsets = false
+      #endif
         
         let config = ZLPhotoConfiguration.default()
         

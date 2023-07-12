@@ -207,8 +207,10 @@ public class ZLEditImageConfiguration: NSObject {
     /// Give an impact feedback when the adjust slider value is zero. Defaults to true.
     @objc public var impactFeedbackWhenAdjustSliderValueIsZero = true
     
+  #if !os(xrOS)
     /// Impact feedback style. Defaults to .medium
     @objc public var impactFeedbackStyle: UIImpactFeedbackGenerator.FeedbackStyle = .medium
+  #endif
     
     /// Whether to support redo in graffiti and mosaic tools. Defaults to false
     @objc public var canRedo = false
@@ -276,12 +278,14 @@ public extension ZLEditImageConfiguration {
         return self
     }
     
+#if !os(xrOS)
     @discardableResult
     func impactFeedbackStyle(_ style: UIImpactFeedbackGenerator.FeedbackStyle) -> ZLEditImageConfiguration {
         impactFeedbackStyle = style
         return self
     }
-    
+#endif
+  
     @discardableResult
     func canRedo(_ value: Bool) -> ZLEditImageConfiguration {
         canRedo = value

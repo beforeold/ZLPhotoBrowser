@@ -100,7 +100,7 @@ func deviceSafeAreaInsets() -> UIEdgeInsets {
     var insets: UIEdgeInsets = .zero
     
     if #available(iOS 11, *) {
-        insets = UIApplication.shared.keyWindow?.safeAreaInsets ?? .zero
+      insets = ZLScreen.main.keyWindow?.safeAreaInsets ?? .zero
     }
     
     return insets
@@ -149,7 +149,7 @@ func showAlertController(title: String?, message: String?, style: ZLCustomAlertS
     if deviceIsiPad() {
         alert.popoverPresentationController?.sourceView = sender?.view
     }
-    (sender ?? UIApplication.shared.keyWindow?.rootViewController)?.zl.showAlertController(alert)
+    (sender ?? ZLScreen.main.keyWindow?.rootViewController)?.zl.showAlertController(alert)
 }
 
 func canAddModel(_ model: ZLPhotoModel, currentSelectCount: Int, sender: UIViewController?, showAlert: Bool = true) -> Bool {

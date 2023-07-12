@@ -28,6 +28,7 @@ import UIKit
 import AVFoundation
 import Photos
 
+#if !os(xrOS)
 public class ZLVideoManager: NSObject {
     class func getVideoExportFilePath(format: String? = nil) -> String {
         let format = format ?? ZLPhotoConfiguration.default().cameraConfiguration.videoExportType.format
@@ -231,3 +232,4 @@ public extension ZLVideoManager {
         case mp4
     }
 }
+#endif

@@ -236,7 +236,7 @@ public class ZLImagePreviewController: UIViewController {
         
         resetBottomViewFrame()
         
-        let ori = UIApplication.shared.statusBarOrientation
+      let ori = ZLScreen.main.statusBarOrientation
         if ori != orientation {
             orientation = ori
             collectionView.setContentOffset(
@@ -265,7 +265,9 @@ public class ZLImagePreviewController: UIViewController {
     
     private func setupUI() {
         view.backgroundColor = .zl.previewVCBgColor
+      #if !os(xrOS)
         automaticallyAdjustsScrollViewInsets = false
+      #endif
         
         view.addSubview(navView)
         

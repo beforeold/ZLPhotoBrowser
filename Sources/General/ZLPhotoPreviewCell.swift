@@ -61,7 +61,7 @@ class ZLPreviewBaseCell: UICollectionViewCell {
         var width = viewW
         
         // video和livephoto没必要处理长图和宽图
-        if UIApplication.shared.statusBarOrientation.isLandscape {
+        if ZLScreen.main.statusBarOrientation.isLandscape {
             let height = viewH
             frame.size.height = height
             
@@ -100,7 +100,7 @@ class ZLPreviewBaseCell: UICollectionViewCell {
         
         imageView.frame = frame
         
-        if UIApplication.shared.statusBarOrientation.isLandscape {
+        if ZLScreen.main.statusBarOrientation.isLandscape {
             if frame.height < viewH {
                 imageView.center = CGPoint(x: viewW / 2, y: viewH / 2)
             } else {

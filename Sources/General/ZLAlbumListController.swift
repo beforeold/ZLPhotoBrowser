@@ -109,7 +109,9 @@ class ZLAlbumListController: UIViewController {
         
         tableView.frame = CGRect(x: insets.left, y: 0, width: view.frame.width - insets.left - insets.right, height: view.frame.height)
         tableView.contentInset = UIEdgeInsets(top: collectionViewInsetTop, left: 0, bottom: 0, right: 0)
+#if !os(xrOS)
         tableView.scrollIndicatorInsets = UIEdgeInsets(top: 44, left: 0, bottom: 0, right: 0)
+      #endif
     }
     
     private func setupUI() {

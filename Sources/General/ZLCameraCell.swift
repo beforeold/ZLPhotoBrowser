@@ -27,6 +27,7 @@
 import UIKit
 import AVFoundation
 
+#if !os(xrOS)
 class ZLCameraCell: UICollectionViewCell {
     
     private lazy var imageView: UIImageView = {
@@ -150,3 +151,4 @@ class ZLCameraCell: UICollectionViewCell {
     }
     
 }
+#endif

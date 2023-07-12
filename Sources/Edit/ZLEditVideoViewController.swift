@@ -288,6 +288,7 @@ public class ZLEditVideoViewController: UIViewController {
         let hud = ZLProgressHUD(style: ZLPhotoUIConfiguration.default().hudStyle)
         hud.show()
         
+      #if !os(xrOS)
         ZLVideoManager.exportEditVideo(for: avAsset, range: getTimeRange()) { [weak self] url, error in
             hud.hide()
             if let er = error {
@@ -298,6 +299,7 @@ public class ZLEditVideoViewController: UIViewController {
                 }
             }
         }
+      #endif
     }
     
     @objc private func leftSidePanAction(_ pan: UIPanGestureRecognizer) {

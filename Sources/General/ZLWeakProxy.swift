@@ -1805,7 +1805,7 @@ extension PhotoPreviewController: UICollectionViewDataSource, UICollectionViewDe
         let model = arrDataSources[indexPath.row]
       
         if let assetWidth = layoutContext.assetWidth, let assetHeight = layoutContext.assetHeight {
-            let scale = UIScreen.main.scale
+            let scale = ZLScreen.main.scale
             let presetPreviewSize = CGSize(width: assetWidth * scale, height: assetHeight * scale)
             model.presetPreviewSize = presetPreviewSize
         } else {
@@ -1895,7 +1895,11 @@ fileprivate struct HapticFeedback {
 
 fileprivate extension Int {
     var actualPixel: CGFloat {
-        return CGFloat(self) * UIScreen.main.bounds.width / 375
+        #if os(xrOS)
+        return CGFloat(self)
+        #else
+        return CGFloat(self) * ZLScreen.main.bounds.width / 375
+        #endif
     }
 }
 
@@ -1913,7 +1917,7 @@ class SelectedPhotoPreview: UIView, UICollectionViewDataSource, UICollectionView
  
         let itemLength = self.layoutContext.thumbnailLength
         let assetInset = self.layoutContext.assetInset
-        let forCenterInset = 0.5 * (UIScreen.main.bounds.width - itemLength - 2 * assetInset)
+        let forCenterInset = 0.5 * (ZLScreen.main.bounds.width - itemLength - 2 * assetInset)
         
         let layout = UICollectionViewFlowLayout()
         layout.itemSize = CGSize(width: itemLength, height: itemLength)
@@ -2596,7 +2600,7 @@ class PhotoPreviewPopInteractiveTransition: UIPercentDrivenInteractiveTransition
             
             let vel = pan.velocity(in: viewController?.view)
             let p = pan.translation(in: viewController?.view)
-            let percent: CGFloat = max(0.0, p.y / (viewController?.view.bounds.height ?? UIScreen.main.bounds.height))
+            let percent: CGFloat = max(0.0, p.y / (viewController?.view.bounds.height ?? ZLScreen.main.bounds.height))
             
             let dismiss = vel.y > 300 || (percent > 0.1 && vel.y > -300)
             
@@ -2617,7 +2621,7 @@ class PhotoPreviewPopInteractiveTransition: UIPercentDrivenInteractiveTransition
         let currentTouch = pan.location(in: viewController?.view)
         
         // 由下拉的偏移值决定缩放比例，越往下偏移，缩得越小。scale值区间[0.3, 1.0]
-        let scale = min(1.0, max(0.3, 1 - translation.y / UIScreen.main.bounds.height))
+        let scale = min(1.0, max(0.3, 1 - translation.y / ZLScreen.main.bounds.height))
         
         let width = imageViewOriginalFrame.size.width * scale
         let height = imageViewOriginalFrame.size.height * scale
@@ -3016,6 +3020,42 @@ fileprivate func formatDate(_ date: Date?) -> String? {
     return formatter.string(from: date)
 }
 
+public struct ZLScreen {
+    public static let main: ZLScreen = .init()
+    public init() { }
+    
+    public var keyWindow: UIWindow? {
+        #if os(xrOS)
+        return nil
+        #else
+        return UIApplication.shared.keyWindow
+        #endif
+    }
+    
+    public var statusBarOrientation: UIInterfaceOrientation {
+#if os(xrOS)
+        return .landscapeLeft
+#else
+        return UIApplication.shared.statusBarOrientation
+#endif
+    }
+    
+    public var scale: CGFloat {
+#if os(xrOS)
+        return 3
+#else
+        return ZLScreen.main.scale
+#endif
+    }
+    
+    public var bounds: CGRect {
+#if os(xrOS)
+        return CGRect(x: 0, y: 0, width: 414, height: 896)
+#else
+        return UIScreen.main.bounds
+#endif
+    }
+}
 
 #if DEBUG
 struct PhotoInfoView_Previews: PreviewProvider {

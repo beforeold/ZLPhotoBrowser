@@ -91,7 +91,7 @@ public class ZLProgressHUD: UIView {
     
     @objc public init(style: ZLProgressHUD.HUDStyle) {
         self.style = style
-        super.init(frame: UIScreen.main.bounds)
+        super.init(frame: ZLScreen.main.bounds)
         setupUI()
     }
     
@@ -142,7 +142,7 @@ public class ZLProgressHUD: UIView {
     @objc public func show(timeout: TimeInterval = 100) {
         ZLMainAsync {
             self.startAnimation()
-            UIApplication.shared.keyWindow?.addSubview(self)
+          ZLScreen.main.keyWindow?.addSubview(self)
         }
         if timeout > 0 {
             cleanTimer()

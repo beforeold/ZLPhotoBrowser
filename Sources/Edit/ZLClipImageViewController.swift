@@ -326,7 +326,7 @@ class ZLClipImageViewController: UIViewController {
         bottomToolView.frame = CGRect(x: 0, y: view.bounds.height - ZLClipImageViewController.bottomToolViewH, width: view.bounds.width, height: ZLClipImageViewController.bottomToolViewH)
         bottomShadowLayer.frame = bottomToolView.bounds
         
-        bottomToolLineView.frame = CGRect(x: 0, y: 0, width: view.bounds.width, height: 1 / UIScreen.main.scale)
+        bottomToolLineView.frame = CGRect(x: 0, y: 0, width: view.bounds.width, height: 1 / ZLScreen.main.scale)
         let toolBtnH: CGFloat = 25
         let toolBtnY = (ZLClipImageViewController.bottomToolViewH - toolBtnH) / 2 - 10
         cancelBtn.frame = CGRect(x: 30, y: toolBtnY, width: toolBtnH, height: toolBtnH)
@@ -397,8 +397,8 @@ class ZLClipImageViewController: UIViewController {
         var rect = CGRect.zero
         rect.origin.x = 15
         rect.origin.y = insets.top
-        rect.size.width = UIScreen.main.bounds.width - 15 * 2
-        rect.size.height = UIScreen.main.bounds.height - insets.top - ZLClipImageViewController.bottomToolViewH - ZLClipImageViewController.clipRatioItemSize.height - 25
+        rect.size.width = ZLScreen.main.bounds.width - 15 * 2
+        rect.size.height = ZLScreen.main.bounds.height - insets.top - ZLClipImageViewController.bottomToolViewH - ZLClipImageViewController.clipRatioItemSize.height - 25
         return rect
     }
     
@@ -538,6 +538,7 @@ class ZLClipImageViewController: UIViewController {
     }
     
     @objc private func doneBtnClick() {
+#if !os(xrOS)
         let image = clipImage()
         dismissAnimateFromRect = clipBoxFrame
         dismissAnimateImage = image.clipImage
@@ -549,6 +550,7 @@ class ZLClipImageViewController: UIViewController {
             clipDoneBlock?(angle, image.editRect, selectedRatio)
             dismiss(animated: animate, completion: nil)
         }
+#endif
     }
     
     @objc private func rotateBtnClick() {

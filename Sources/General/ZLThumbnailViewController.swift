@@ -172,7 +172,10 @@ class ZLThumbnailViewController: UIViewController {
         if #available(iOS 11.0, *) {
             view.contentInsetAdjustmentBehavior = .always
         }
+      #if !os(xrOS)
         ZLCameraCell.zl.register(view)
+      #endif
+      
         ZLThumbnailPhotoCell.zl.register(view)
         ZLAddPhotoCell.zl.register(view)
         
@@ -182,10 +185,14 @@ class ZLThumbnailViewController: UIViewController {
     var arrDataSources: [ZLPhotoModel] = []
     
     var showCameraCell: Bool {
+      #if os(xrOS)
+      return false
+      #else
         if ZLPhotoConfiguration.default().allowTakePhotoInLibrary, self.albumList.isCameraRoll {
             return true
         }
         return false
+      #endif
     }
     
     @available(iOS 14, *)
@@ -284,7 +291,9 @@ class ZLThumbnailViewController: UIViewController {
         let totalWidth = view.frame.width - insets.left - insets.right
         collectionView.frame = CGRect(x: insets.left, y: 0, width: totalWidth, height: view.frame.height)
         collectionView.contentInset = UIEdgeInsets(top: collectionViewInsetTop, left: 0, bottom: bottomViewH, right: 0)
+      #if !os(xrOS)
         collectionView.scrollIndicatorInsets = UIEdgeInsets(top: insets.top, left: 0, bottom: bottomViewH, right: 0)
+      #endif
         
         if !isLayoutOK {
             scrollToBottom()
@@ -332,7 +341,9 @@ class ZLThumbnailViewController: UIViewController {
     }
     
     private func setupUI() {
+      #if !os(xrOS)
         automaticallyAdjustsScrollViewInsets = true
+      #endif
         edgesForExtendedLayout = .all
         view.backgroundColor = .zl.thumbnailBgColor
         
@@ -751,11 +762,13 @@ class ZLThumbnailViewController: UIViewController {
     private func showCamera() {
         let config = ZLPhotoConfiguration.default()
         if config.useCustomCamera {
+          #if !os(xrOS)
             let camera = ZLCustomCamera()
             camera.takeDoneBlock = { [weak self] image, videoUrl in
                 self?.save(image: image, videoUrl: videoUrl)
             }
             showDetailViewController(camera, sender: nil)
+          #endif
         } else {
             if !UIImagePickerController.isSourceTypeAvailable(.camera) {
                 showAlertView(localLanguageTextValue(.cameraUnavailable), self)
@@ -765,7 +778,9 @@ class ZLThumbnailViewController: UIViewController {
                 picker.allowsEditing = false
                 picker.videoQuality = .typeHigh
                 picker.sourceType = .camera
+              #if !os(xrOS)
                 picker.cameraFlashMode = config.cameraConfiguration.flashMode.imagePickerFlashMode
+              #endif
                 var mediaTypes = [String]()
                 if config.allowTakePhoto {
                     mediaTypes.append("public.image")
@@ -955,7 +970,7 @@ extension ZLThumbnailViewController: UICollectionViewDataSource, UICollectionVie
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         let defaultCount = CGFloat(ZLPhotoConfiguration.default().columnCount)
         var columnCount: CGFloat = deviceIsiPad() ? (defaultCount + 2) : defaultCount
-        if UIApplication.shared.statusBarOrientation.isLandscape {
+      if ZLScreen.main.statusBarOrientation.isLandscape {
             columnCount += 2
         }
         let totalW = collectionView.bounds.width - (columnCount - 1) * ZLLayout.thumbCollectionViewItemSpacing
@@ -969,6 +984,8 @@ extension ZLThumbnailViewController: UICollectionViewDataSource, UICollectionVie
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let config = ZLPhotoConfiguration.default()
+      
+      #if !os(xrOS)
         if showCameraCell, (config.sortAscending && indexPath.row == arrDataSources.count) || (!config.sortAscending && indexPath.row == 0) {
             // camera cell
             
@@ -980,7 +997,8 @@ extension ZLThumbnailViewController: UICollectionViewDataSource, UICollectionVie
             
             return cell
         }
-        
+      #endif
+      
         if #available(iOS 14, *) {
             if self.showAddPhotoCell, (config.sortAscending && indexPath.row == self.arrDataSources.count - 1 + self.offset) || (!config.sortAscending && indexPath.row == self.offset - 1) {
                 return collectionView.dequeueReusableCell(withReuseIdentifier: ZLAddPhotoCell.zl.identifier, for: indexPath)
