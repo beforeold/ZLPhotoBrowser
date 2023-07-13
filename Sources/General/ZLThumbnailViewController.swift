@@ -232,7 +232,9 @@ class ZLThumbnailViewController: UIViewController {
             view.addGestureRecognizer(panGes)
         }
         
+      #if !os(xrOS)
         NotificationCenter.default.addObserver(self, selector: #selector(deviceOrientationChanged(_:)), name: UIApplication.willChangeStatusBarOrientationNotification, object: nil)
+      #endif
         
         loadPhotos()
         
@@ -760,15 +762,14 @@ class ZLThumbnailViewController: UIViewController {
     }
     
     private func showCamera() {
+#if !os(xrOS)
         let config = ZLPhotoConfiguration.default()
         if config.useCustomCamera {
-          #if !os(xrOS)
             let camera = ZLCustomCamera()
             camera.takeDoneBlock = { [weak self] image, videoUrl in
                 self?.save(image: image, videoUrl: videoUrl)
             }
             showDetailViewController(camera, sender: nil)
-          #endif
         } else {
             if !UIImagePickerController.isSourceTypeAvailable(.camera) {
                 showAlertView(localLanguageTextValue(.cameraUnavailable), self)
@@ -778,9 +779,7 @@ class ZLThumbnailViewController: UIViewController {
                 picker.allowsEditing = false
                 picker.videoQuality = .typeHigh
                 picker.sourceType = .camera
-              #if !os(xrOS)
                 picker.cameraFlashMode = config.cameraConfiguration.flashMode.imagePickerFlashMode
-              #endif
                 var mediaTypes = [String]()
                 if config.allowTakePhoto {
                     mediaTypes.append("public.image")
@@ -795,6 +794,7 @@ class ZLThumbnailViewController: UIViewController {
                 showAlertView(String(format: localLanguageTextValue(.noCameraAuthority), getAppName()), self)
             }
         }
+#endif
     }
     
     private func save(image: UIImage?, videoUrl: URL?) {
@@ -1071,10 +1071,13 @@ extension ZLThumbnailViewController: UICollectionViewDataSource, UICollectionVie
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         let c = collectionView.cellForItem(at: indexPath)
+      #if !os(xrOS)
         if c is ZLCameraCell {
             showCamera()
             return
         }
+      #endif
+      
         if #available(iOS 14, *) {
             if c is ZLAddPhotoCell {
                 PHPhotoLibrary.shared().presentLimitedLibraryPicker(from: self)

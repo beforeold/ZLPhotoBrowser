@@ -1066,7 +1066,7 @@ class ZLPreviewView: UIView {
         var width = viewW
         
       let isLandscape = true
-      // UIApplication.shared.statusBarOrientation.isLandscape
+      // ZLScreen.main.statusBarOrientation.isLandscape
         if isLandscape {
             let height = viewH
             frame.size.height = height

@@ -422,19 +422,27 @@ public extension ZLPhotoManager {
     }
     
     @objc class func hasCameraAuthority() -> Bool {
+      #if os(xrOS)
+      return false
+      #else
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         if status == .restricted || status == .denied {
             return false
         }
         return true
+      #endif
     }
     
     @objc class func hasMicrophoneAuthority() -> Bool {
+#if os(xrOS)
+      return false
+#else
         let status = AVCaptureDevice.authorizationStatus(for: .audio)
         if status == .restricted || status == .denied {
             return false
         }
         return true
+#endif
     }
     
 }

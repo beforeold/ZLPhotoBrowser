@@ -479,7 +479,7 @@ class PhotoPreviewController: UIViewController {
         
         setupGestureDepend(on: collectionView)
         
-        let ori = UIApplication.shared.statusBarOrientation
+        let ori = ZLScreen.main.statusBarOrientation
         if ori != orientation {
             orientation = ori
             
@@ -1887,9 +1887,11 @@ fileprivate struct HapticFeedback {
   ///
   /// @note haptic feedback might not work on old devices
   static func selectionChanged() {
+    #if !os(xrOS)
     let feedback = UISelectionFeedbackGenerator()
     feedback.prepare()
     feedback.selectionChanged()
+    #endif
   }
 }
 
@@ -3044,7 +3046,7 @@ public struct ZLScreen {
 #if os(xrOS)
         return 3
 #else
-        return ZLScreen.main.scale
+        return UIScreen.main.scale
 #endif
     }
     

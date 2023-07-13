@@ -70,7 +70,7 @@ class ZLEmbedAlbumListView: UIView {
     
     override func layoutSubviews() {
         super.layoutSubviews()
-        let currOri = UIApplication.shared.statusBarOrientation
+        let currOri = ZLScreen.main.statusBarOrientation
         
         guard currOri != orientation else {
             return
@@ -124,7 +124,7 @@ class ZLEmbedAlbumListView: UIView {
         let contentH = CGFloat(arrDataSource.count) * ZLEmbedAlbumListView.rowH
         
         let maxH: CGFloat
-        if UIApplication.shared.statusBarOrientation.isPortrait {
+        if ZLScreen.main.statusBarOrientation.isPortrait {
             maxH = min(frame.height * 0.7, contentH)
         } else {
             maxH = min(frame.height * 0.8, contentH)

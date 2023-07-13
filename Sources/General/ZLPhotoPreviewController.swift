@@ -227,7 +227,7 @@ class ZLPhotoPreviewController: UIViewController {
         
         refreshBottomViewFrame()
         
-        let ori = UIApplication.shared.statusBarOrientation
+        let ori = ZLScreen.main.statusBarOrientation
         if ori != orientation {
             orientation = ori
             
