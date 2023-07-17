@@ -18,10 +18,10 @@ class TestCustomPreviewViewController: UIViewController {
     
     showCustomView()
     
-    let fullItem = UIBarButtonItem(title: "Full", style: .plain, target: self, action: #selector(onCreatePhotosPreview))
+    let fullItem = UIBarButtonItem(title: "Preview List", style: .plain, target: self, action: #selector(onCreatePhotosPreview))
     navigationItem.rightBarButtonItem = fullItem
       
-    let singleItem = UIBarButtonItem(title: "One", style: .plain, target: self, action: #selector(onPreviewOneEvent))
+    let singleItem = UIBarButtonItem(title: "Pure One", style: .plain, target: self, action: #selector(onPreviewOneEvent))
     navigationItem.rightBarButtonItems = [fullItem, singleItem]
   }
   

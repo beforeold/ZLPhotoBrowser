@@ -51,9 +51,6 @@ class ZLWeakProxy: NSObject {
 
 import Photos
 
-private func clamp(_ minValue: Int, _ value: Int, _ maxValue: Int) -> Int {
-    return max(minValue, min(value, maxValue))
-}
 
 public typealias ZLAssetFromFrameProvider = ((Int) -> CGRect?)?
 
@@ -976,14 +973,16 @@ class PhotoPreviewController: UIViewController {
         }
         
         let config = ZLPhotoConfiguration.default()
-        let currentModel = arrDataSources[currentIndex]
+        guard let currentModel = arrDataSources.safeEelement(at: currentIndex) else {
+            return
+        }
         
         if (!config.allowMixSelect && currentModel.type == .video) || (!config.showSelectBtnWhenSingleSelect && config.maxSelectCount == 1) {
             selectBtn.isHidden = true
         } else {
             selectBtn.isHidden = false
         }
-        selectBtn.isSelected = arrDataSources[currentIndex].isSelected
+        selectBtn.isSelected = currentModel.isSelected
         resetIndexLabelStatus()
         
         let indexText = "\(currentIndex + 1)/\(arrDataSources.count)"
@@ -1019,7 +1018,9 @@ class PhotoPreviewController: UIViewController {
         }
         
         let config = ZLPhotoConfiguration.default()
-        let currentModel = arrDataSources[currentIndex]
+        guard let currentModel = arrDataSources.safeEelement(at: currentIndex) else {
+            return
+        }
         
         // the following logic are about the bottom bar
         let selCount = nav.arrSelectedModels.count
@@ -1136,7 +1137,9 @@ class PhotoPreviewController: UIViewController {
     }
     
     private func handleRemovingCurrentIndex(reason: String) {
-        let currentModel = arrDataSources[currentIndex]
+        guard let currentModel = arrDataSources.safeEelement(at: currentIndex) else {
+            return
+        }
         
         arrDataSources.remove(at: currentIndex)
         collectionView.deleteItems(at: [IndexPath(item: currentIndex, section: 0)])
@@ -1198,7 +1201,10 @@ class PhotoPreviewController: UIViewController {
     }
     
     private func saveAssetToAlbum(_ ablum :PHAssetCollection?, albumName: String) {
-      let currentModel = arrDataSources[currentIndex]
+        guard let currentModel = arrDataSources.safeEelement(at: currentIndex) else {
+            return
+        }
+        
       PHPhotoLibrary.shared().performChanges({
           let request = PHAssetCollectionChangeRequest(for: ablum!)
           request?.addAssets([currentModel.asset] as NSFastEnumeration)
@@ -1263,7 +1269,9 @@ class PhotoPreviewController: UIViewController {
     }
     
     @objc private func selectBtnClick() {
-        let currentModel = arrDataSources[currentIndex]
+        guard let currentModel = arrDataSources.safeEelement(at: currentIndex) else {
+            return
+        }
         handleSelectEvent(model: currentModel)
     }
     
@@ -1302,7 +1310,9 @@ class PhotoPreviewController: UIViewController {
     
     @objc private func editBtnClick() {
         let config = ZLPhotoConfiguration.default()
-        let model = arrDataSources[currentIndex]
+        guard let model = arrDataSources.safeEelement(at: currentIndex) else {
+            return
+        }
         
         var requestAvAssetID: PHImageRequestID?
         let hud = ZLProgressHUD(style: ZLPhotoUIConfiguration.default().hudStyle)
@@ -1383,7 +1393,10 @@ class PhotoPreviewController: UIViewController {
             }
         }
         
-        let currentModel = arrDataSources[currentIndex]
+        guard let currentModel = arrDataSources.safeEelement(at: currentIndex) else {
+            return
+        }
+        
         if autoSelectCurrentIfNotSelectAnyone {
             if nav.arrSelectedModels.isEmpty, canAddModel(currentModel, currentSelectCount: nav.arrSelectedModels.count, sender: self) {
                 nav.arrSelectedModels.append(currentModel)
@@ -1430,8 +1443,11 @@ class PhotoPreviewController: UIViewController {
     }
     
     private func tapPreviewCell() {
+        guard let model = arrDataSources.safeEelement(at: currentIndex) else {
+            return
+        }
+        
         if let tapPreviewCellCallback = context?["tapPreviewCellCallback"] as? (PHAsset, Int) -> Void {
-            let model = arrDataSources[currentIndex]
             tapPreviewCellCallback(model.asset, currentIndex)
             return
         }
@@ -1454,7 +1470,9 @@ class PhotoPreviewController: UIViewController {
     }
     
     private func showEditImageVC(image: UIImage) {
-        let model = arrDataSources[currentIndex]
+        guard let model = arrDataSources.safeEelement(at: currentIndex) else {
+            return
+        }
         let nav = navigationController as? ZLImageNavControllerProtocol
         ZLEditImageViewController.showEditImageVC(parentVC: self, image: image, editModel: model.editImageModel) { [weak self, weak nav] ei, editImageModel in
             guard let `self` = self else { return }
@@ -1627,7 +1645,9 @@ extension PhotoPreviewController {
         requestOptions.deliveryMode = .fastFormat
         requestOptions.isNetworkAccessAllowed = true
         
-        let model = arrDataSources[currentIndex]
+        guard let model = arrDataSources.safeEelement(at: currentIndex) else {
+            return
+        }
         let asset = model.asset
         
         var totalProperties: [String: Any] = [:]
@@ -1723,7 +1743,11 @@ extension PhotoPreviewController {
         }
         
         updateCurrentIndex(page)
-        selPhotoPreview?.currentShowModelChanged(model: arrDataSources[currentIndex])
+        
+        guard let model = arrDataSources.safeEelement(at: currentIndex) else {
+            return
+        }
+        selPhotoPreview?.currentShowModelChanged(model: model)
     }
     
     var usedSpacePerItem: CGFloat {
@@ -3006,6 +3030,22 @@ fileprivate func sfProFont(_ size: CGFloat) -> UIFont {
 }
 
 
+// MARK: - utils
+private func clamp(_ minValue: Int, _ value: Int, _ maxValue: Int) -> Int {
+    return max(minValue, min(value, maxValue))
+}
+
+extension Array {
+    func safeEelement(at index: Int) -> Element? {
+        guard index >= 0 && index < self.count else {
+            return nil
+        }
+        
+        return self[index]
+    }
+}
+
+/// format the date to style like `Nov 24, 2022 at 19:51`
 fileprivate func formatDate(_ date: Date?) -> String? {
     guard let date = date else { return nil }
     let formatter = DateFormatter()
